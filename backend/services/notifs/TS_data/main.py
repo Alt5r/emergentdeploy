@@ -1,76 +1,89 @@
 """
 Main script for fetching and displaying real-time NHC tropical storm data.
-
-This script orchestrates the fetching, parsing, and display of active tropical
-storms and hurricanes from NOAA's National Hurricane Center.
 """
 
 from nhc_fetcher import NHCDataFetcher
 from storm_parser import StormParser
 import json
 
-def display_storm_info(storm, parser, fetcher, storm_number=1):
-    """Helper function to display storm information in a formatted way."""
+def get_storm_data_json():
+    """
+    Fetches and returns all active storm data in JSON format.
     
-    print(f"\n🌀 STORM #{storm_number}")
-    print("-" * 70)
+    Returns:
+        str: JSON string containing all storm data
+    """
+    fetcher = NHCDataFetcher()
+    parser = StormParser()
     
-    # Display basic information
-    print(f"Name:           {storm['name']}")
-    print(f"ID:             {storm['id']}")
-    print(f"Classification: {storm['classification']}")
+    # Fetch active storms
+    active_storms = fetcher.get_active_storms()
     
-    # Determine severity
-    severity = parser.parse_storm_severity(
-        storm['classification'], 
-        str(storm['wind_speed_kt'])
-    )
-    print(f"Severity:       {severity}")
+    if active_storms is None:
+        return json.dumps({
+            "status": "error",
+            "message": "Failed to fetch storm data",
+            "storms": []
+        }, indent=2)
     
-    # Display position
-    print(f"\n📍 Current Position:")
-    print(f"   Latitude:    {storm['latitude']}")
-    print(f"   Longitude:   {storm['longitude']}")
+    all_storm_data = []
     
-    # Display intensity
-    print(f"\n💨 Intensity:")
-    print(f"   Max Winds:   {storm['wind_speed_kt']} knots")
-    print(f"   Pressure:    {storm['pressure']} mb")
-    print(f"   Movement:    {storm['movement']}")
+    # If no active storms, use test data
+    if not active_storms or len(active_storms) == 0:
+        test_storms = _get_test_storm_data()
+        active_storms = test_storms
     
-    # Display update time
-    print(f"\n🕐 Last Update:  {storm['last_update']}")
-    
-    # Try to get detailed advisory for forecast track
-    if storm['id'] != 'Unknown':
-        print(f"\n📊 Fetching forecast track...")
-        details = fetcher.get_storm_details(storm['id'], storm['basin'])
+    # Process each storm
+    for storm_raw in active_storms:
+        storm = parser.parse_active_storm(storm_raw)
         
-        if details and 'advisory_text' in details:
-            # Extract forecast positions
-            forecast = parser.extract_forecast_positions(details['advisory_text'])
-            
-            if forecast:
-                print(f"   Found {len(forecast)} forecast points:")
-                for fp in forecast[:5]:  # Show first 5 forecast points
-                    print(f"      {fp['time_ahead']}: ({fp['latitude']:.2f}, {fp['longitude']:.2f}) - {fp['wind_speed_kt']} kt")
-            else:
-                print("   Forecast track data not available in advisory.")
+        severity = parser.parse_storm_severity(
+            storm['classification'], 
+            str(storm['wind_speed_kt'])
+        )
+        
+        forecast_positions = []
+        if storm['id'] != 'Unknown':
+            details = fetcher.get_storm_details(storm['id'], storm['basin'])
+            if details and 'advisory_text' in details:
+                forecast_positions = parser.extract_forecast_positions(details['advisory_text'])
+        
+        storm_data = {
+            "id": storm['id'],
+            "name": storm['name'],
+            "classification": storm['classification'],
+            "severity": severity,
+            "basin": storm['basin'],
+            "current_position": {
+                "latitude": storm['latitude'],
+                "longitude": storm['longitude']
+            },
+            "intensity": {
+                "max_sustained_winds_knots": storm['wind_speed_kt'],
+                "pressure_mb": storm['pressure'],
+                "intensity_level": storm['intensity']
+            },
+            "movement": storm['movement'],
+            "last_update": storm['last_update'],
+            "forecast_track": forecast_positions,
+            "advisories": {
+                "public_advisory": storm['public_advisory'],
+                "forecast_advisory": storm['forecast_advisory']
+            }
+        }
+        
+        all_storm_data.append(storm_data)
     
-    storm['severity'] = severity
-    print("-" * 70)
-    return storm
+    result = {
+        "status": "success",
+        "timestamp": all_storm_data[0]['last_update'] if all_storm_data else None,
+        "total_storms": len(all_storm_data),
+        "storms": all_storm_data
+    }
+    
+    return json.dumps(result, indent=2)
 
-def fetch_historical_test_data():
-    """Fetches a recent historical storm for testing purposes."""
-    
-    print("\n" + "=" * 70)
-    print("TESTING WITH HISTORICAL DATA (2024 Hurricane Season)")
-    print("=" * 70)
-    print()
-    
-    # Hurricane Helene (2024) - Recent major hurricane
-    # This is example data structure similar to what NHC provides
+def _get_test_storm_data():
     test_storm = {
         'id': 'al092024',
         'name': 'Helene',
@@ -86,58 +99,68 @@ def fetch_historical_test_data():
         'publicAdvisory': 'https://www.nhc.noaa.gov/text/refresh/MIATCPAT4+shtml/261459.shtml',
         'forecastAdvisory': 'https://www.nhc.noaa.gov/text/refresh/MIATCMAT4+shtml/261459.shtml'
     }
-    
     return [test_storm]
 
 def main():
-    """Main function to fetch and display active storm data."""
-    
     print("=" * 70)
     print("NOAA National Hurricane Center - Real-time Storm Data")
     print("=" * 70)
     print()
     
-    # Initialize fetcher and parser
-    fetcher = NHCDataFetcher()
-    parser = StormParser()
+    storm_json = get_storm_data_json()
+    storm_data_obj = json.loads(storm_json)
     
-    # Fetch active storms
-    print("Fetching active storms from NHC...")
-    active_storms = fetcher.get_active_storms()
-    
-    if active_storms is None:
-        print("❌ Failed to fetch storm data. Please check your internet connection.")
+    if storm_data_obj['status'] == 'error':
+        print(f"❌ {storm_data_obj['message']}")
         return
     
-    all_storm_data = []
+    print(f"Fetching active storms from NHC...")
     
-    if not active_storms or len(active_storms) == 0:
+    if storm_data_obj['total_storms'] == 0:
         print("✅ No active tropical storms or hurricanes at this time.")
-        print("   This is good news!")
-        
-        # Fetch historical test data to verify functionality
-        print("\n⚠️  Since there are no active storms, testing with recent historical data...")
-        test_storms = fetch_historical_test_data()
-        
-        for i, storm_raw in enumerate(test_storms, 1):
-            storm = parser.parse_active_storm(storm_raw)
-            storm_data = display_storm_info(storm, parser, fetcher, i)
-            all_storm_data.append(storm_data)
-    else:
-        print(f"✅ Found {len(active_storms)} active storm(s)\n")
-        print("=" * 70)
-        
-        # Process each active storm
-        for i, storm_raw in enumerate(active_storms, 1):
-            storm = parser.parse_active_storm(storm_raw)
-            storm_data = display_storm_info(storm, parser, fetcher, i)
-            all_storm_data.append(storm_data)
+        return
     
-    # Save all data to JSON file
+    if storm_data_obj['storms'][0]['id'] == 'al092024':
+        print("✅ No active tropical storms or hurricanes at this time.")
+        print("\n⚠️  Testing with recent historical data...")
+        print("\n" + "=" * 70)
+        print("TESTING WITH HISTORICAL DATA (2024 Hurricane Season)")
+        print("=" * 70)
+    else:
+        print(f"✅ Found {storm_data_obj['total_storms']} active storm(s)\n")
+        print("=" * 70)
+    
+    for i, storm in enumerate(storm_data_obj['storms'], 1):
+        print(f"\n🌀 STORM #{i}")
+        print("-" * 70)
+        print(f"Name:           {storm['name']}")
+        print(f"ID:             {storm['id']}")
+        print(f"Classification: {storm['classification']}")
+        print(f"Severity:       {storm['severity']}")
+        
+        print(f"\n📍 Current Position:")
+        print(f"   Latitude:    {storm['current_position']['latitude']}")
+        print(f"   Longitude:   {storm['current_position']['longitude']}")
+        
+        print(f"\n💨 Intensity:")
+        print(f"   Max Winds:   {storm['intensity']['max_sustained_winds_knots']} knots")
+        print(f"   Pressure:    {storm['intensity']['pressure_mb']} mb")
+        print(f"   Movement:    {storm['movement']}")
+        
+        print(f"\n🕐 Last Update:  {storm['last_update']}")
+        
+        if storm['forecast_track']:
+            print(f"\n📊 Forecast Track:")
+            print(f"   Found {len(storm['forecast_track'])} forecast points:")
+            for fp in storm['forecast_track'][:5]:
+                print(f"      {fp['time_ahead']}: ({fp['latitude']:.2f}, {fp['longitude']:.2f}) - {fp['wind_speed_kt']} kt")
+        
+        print("-" * 70)
+    
     output_file = "active_storms_data.json"
     try:
         with open(output_file, 'w') as f:
-            json.dump(all_storm_data, f, indent=2)
+            f.write(storm_json)
         print(f"\n💾 Storm data saved to: {output_file}")
     except Exception as e:
         print(f"\n⚠️  Could not save to file: {e}")
@@ -145,6 +168,9 @@ def main():
     print("\n" + "=" * 70)
     print("Data fetch complete!")
     print("=" * 70)
+    
+    print("\n📋 JSON Output Preview:")
+    print(storm_json[:500] + "..." if len(storm_json) > 500 else storm_json)
 
 if __name__ == "__main__":
     main()
