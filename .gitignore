@@ -62,3 +62,4 @@ htmlcov/
 # Cache
 *.cache
 .cache/
+.env
