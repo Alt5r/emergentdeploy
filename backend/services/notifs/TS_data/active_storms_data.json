@@ -1,0 +1,18 @@
+[
+  {
+    "id": "al092024",
+    "name": "Helene",
+    "classification": "Hurricane",
+    "intensity": "Major",
+    "pressure": "938",
+    "latitude": "26.8N",
+    "longitude": "84.5W",
+    "movement": "NNE at 23 mph",
+    "last_update": "2024-09-26T18:00:00.000Z",
+    "public_advisory": "https://www.nhc.noaa.gov/text/refresh/MIATCPAT4+shtml/261459.shtml",
+    "forecast_advisory": "https://www.nhc.noaa.gov/text/refresh/MIATCMAT4+shtml/261459.shtml",
+    "wind_speed_kt": "120",
+    "basin": "al",
+    "severity": "Category 4 Hurricane (Extreme)"
+  }
+]
