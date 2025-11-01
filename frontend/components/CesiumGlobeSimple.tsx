@@ -44,8 +44,11 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
         // Load tropical storms
         const stormResponse = await fetch('http://localhost:8000/api/v1/storms');
         const stormData = await stormResponse.json();
-        console.log("Storms loaded:", stormData);
-        setStorms(stormData.storms || []);
+        console.log("Storms API response:", stormData);
+        // Handle nested structure: stormData.storms.storms
+        const stormsArray = stormData.storms?.storms || stormData.storms || [];
+        console.log("Parsed storms:", stormsArray);
+        setStorms(stormsArray);
 
         // Load tsunami stations
         const tsunamiResponse = await fetch('http://localhost:8000/api/v1/tsunami/stations');
@@ -171,9 +174,14 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
         console.log("Adding storm entities:", storms);
 
         storms.forEach(storm => {
-          // Parse coordinates
-          const lat = parseFloat(storm.latitude);
-          const lon = -Math.abs(parseFloat(storm.longitude)); // West is negative
+          // Parse coordinates - handle nested current_position
+          const latStr = storm.current_position?.latitude || storm.latitude || '0';
+          const lonStr = storm.current_position?.longitude || storm.longitude || '0';
+
+          const lat = parseFloat(latStr.toString().replace('N', '').replace('S', '-'));
+          const lon = -Math.abs(parseFloat(lonStr.toString().replace('W', '').replace('E', '-'))); // West is negative
+
+          console.log(`Storm ${storm.name} position:`, lat, lon);
 
           // Color based on category
           const getStormColor = (severity: string) => {
@@ -211,9 +219,9 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
               <div style="padding: 16px;">
                 <h3 style="color: #ef4444; margin: 0 0 10px 0; font-weight: 700;">🌀 ${storm.classification} ${storm.name}</h3>
                 <p style="margin: 6px 0; color: #fca5a5; font-weight: 600;">${storm.severity}</p>
-                <p style="margin: 8px 0; color: #e5e7eb;">📍 Position: ${storm.latitude}, ${storm.longitude}</p>
-                <p style="margin: 6px 0; color: #e5e7eb;">💨 Winds: ${storm.wind_speed_kt} knots</p>
-                <p style="margin: 6px 0; color: #e5e7eb;">🌪️ Pressure: ${storm.pressure} mb</p>
+                <p style="margin: 8px 0; color: #e5e7eb;">📍 Position: ${latStr}, ${lonStr}</p>
+                <p style="margin: 6px 0; color: #e5e7eb;">💨 Winds: ${storm.intensity?.max_sustained_winds_knots || storm.wind_speed_kt} knots</p>
+                <p style="margin: 6px 0; color: #e5e7eb;">🌪️ Pressure: ${storm.intensity?.pressure_mb || storm.pressure} mb</p>
                 <p style="margin: 6px 0; color: #e5e7eb;">➡️ Movement: ${storm.movement}</p>
               </div>
             `,
