@@ -11,8 +11,8 @@ Automatically synchronizes changes from the upstream repository (sl1nabd/Emergen
 1. **Scheduled Runs**: The workflow runs automatically every hour (on the hour)
 2. **Manual Trigger**: Can also be triggered manually from the GitHub Actions tab
 3. **Change Detection**: Checks if there are new commits in the upstream repository
-4. **Automatic Merge**: If changes are detected, it attempts to merge them automatically
-5. **Push**: Successfully merged changes are pushed to the current branch
+4. **Automatic Merge**: If changes are detected, it attempts to merge them automatically into the `main` branch
+5. **Push**: Successfully merged changes are pushed to the `main` branch
 
 ### Workflow Steps
 1. Checkout the current repository with full history
@@ -34,7 +34,7 @@ To manually trigger the sync:
 1. Go to the "Actions" tab in the GitHub repository
 2. Select "Sync from Upstream" workflow
 3. Click "Run workflow"
-4. Select the branch and click "Run workflow"
+4. Click "Run workflow" again to confirm (the workflow will run on the main branch)
 
 ### Configuration
 The workflow can be customized by editing `.github/workflows/sync-upstream.yml`:
