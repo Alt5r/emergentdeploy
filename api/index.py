@@ -1,16 +1,15 @@
 """
-Vercel Serverless Function for FastAPI
-This wraps the FastAPI app as a Vercel serverless function
+Vercel Serverless Function - FastAPI Entry Point
 """
 import sys
 from pathlib import Path
 
-# Add project root to path
-root_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(root_dir))
+# Add project root
+root = Path(__file__).parent.parent
+sys.path.insert(0, str(root))
 
-# Import FastAPI app
+# Method 1: Direct import (try this first)
 from backend.app.main import app
 
-# Export for Vercel
+# Expose at module level
 app = app
