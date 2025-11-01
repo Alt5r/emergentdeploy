@@ -1,11 +1,23 @@
 """
-Satellite Service - Live Fire Detection Module
+Satellite Service - Multi-Hazard Detection Module
 
-Ingests NASA FIRMS satellite data, clusters fire detections into hotspots,
-and provides real-time fire event data with strong validation and provenance tracking.
+Ingests multiple satellite data sources:
+- NASA FIRMS: Fire detections (VIIRS/MODIS)
+- USGS: Earthquake events (GeoJSON)
+
+Clusters detections into hazard-specific hotspots with strong validation
+and provenance tracking.
 """
 
 from .models import SatelliteSignal, Hotspot
-from .cluster import cluster_fire
+from .clustering import cluster_hazard
+from .firms import fetch_firms_signals
+from .usgs import fetch_usgs_earthquakes
 
-__all__ = ['SatelliteSignal', 'Hotspot', 'cluster_fire']
+__all__ = [
+    'SatelliteSignal',
+    'Hotspot',
+    'cluster_hazard',
+    'fetch_firms_signals',
+    'fetch_usgs_earthquakes'
+]
