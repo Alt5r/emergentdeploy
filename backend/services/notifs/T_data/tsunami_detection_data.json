@@ -1,8 +1,25 @@
 {
   "status": "success",
   "total_stations_analyzed": 55,
-  "events_detected": 0,
-  "triggered_buoys": [],
+  "events_detected": 1,
+  "triggered_buoys": [
+    {
+      "station_id": "21413",
+      "coordinates": {
+        "latitude": 30.487,
+        "longitude": 152.124
+      },
+      "status": "event_detected",
+      "event_details": {
+        "detected_wave_height_m": 5780.85,
+        "mean_wave_height_m": 5779.97,
+        "anomaly_threshold_m": 5780.1,
+        "severity": "High",
+        "timestamp": "2025-11-01T12:00:00Z",
+        "alert_type": "Tsunami Warning - Simulated Example"
+      }
+    }
+  ],
   "all_stations": [
     {
       "station_id": "21413",
@@ -10,8 +27,15 @@
         "latitude": 30.487,
         "longitude": 152.124
       },
-      "status": "normal",
-      "event_details": null
+      "status": "event_detected",
+      "event_details": {
+        "detected_wave_height_m": 5780.85,
+        "mean_wave_height_m": 5779.97,
+        "anomaly_threshold_m": 5780.1,
+        "severity": "High",
+        "timestamp": "2025-11-01T12:00:00Z",
+        "alert_type": "Tsunami Warning - Simulated Example"
+      }
     },
     {
       "station_id": "21414",
