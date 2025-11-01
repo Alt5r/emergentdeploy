@@ -5,6 +5,9 @@ import mapboxgl, { Map, Marker, LngLatBounds, FillExtrusionLayer } from "mapbox-
 import type { FeatureCollection, Feature, Point } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 import UnifiedPinSidebar, { transformMarketAnalysisToStats } from "./UnifiedPinSidebar";
+import { useHandGesture } from "@/hooks/useHandGesture";
+import { HandTrackingOverlay } from "./HandTrackingOverlay";
+import { Slider } from "@/components/ui/slider";
 
 /** ---------- Types ---------- */
 type AudienceProps = {
@@ -42,6 +45,10 @@ type AudienceMapProps = {
   cofoundersData?: unknown;
   demographicsData?: unknown;
   marketAnalysisData?: unknown;
+  /** Enable hand tracking controls */
+  enableHandTracking?: boolean;
+  /** Show video feed for hand tracking */
+  showVideoFeed?: boolean;
 };
 
 /** ---------- Styles ---------- */
@@ -75,6 +82,8 @@ export default function AudienceMap({
   showCompetitors = true,
   showDemographics = true,
   showCofounders = true,
+  enableHandTracking = false,
+  showVideoFeed = false,
 }: AudienceMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -86,6 +95,27 @@ export default function AudienceMap({
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [selectedPinData, setSelectedPinData] = useState<unknown>(null);
+  
+  // Hand tracking state
+  const [cameraRequested, setCameraRequested] = useState(false);
+  const [rotationSensitivity, setRotationSensitivity] = useState(0.5);
+  const [zoomSensitivity, setZoomSensitivity] = useState(0.05);
+  const [showSensitivityControls, setShowSensitivityControls] = useState(false);
+  const lastGestureRef = useRef<string>("None");
+  const gestureStartXRef = useRef<number>(0);
+  const gestureStartYRef = useRef<number>(0);
+
+  // Hand gesture detection
+  const {
+    isReady: gestureReady,
+    error: gestureError,
+    currentGesture,
+    videoRef,
+    initializeCamera,
+  } = useHandGesture({
+    enabled: enableHandTracking,
+    minConfidence: 0.65,
+  });
 
   /** Handle pin click to show sidebar */
   const handlePinClick = useCallback((pinData: unknown) => {
@@ -98,6 +128,96 @@ export default function AudienceMap({
     setSidebarVisible(false);
     setSelectedPinData(null);
   }, []);
+
+  /** Request camera access */
+  const handleRequestCamera = useCallback(() => {
+    setCameraRequested(true);
+    initializeCamera();
+  }, [initializeCamera]);
+
+  /** Auto-initialize camera if hand tracking is enabled */
+  useEffect(() => {
+    if (enableHandTracking && !cameraRequested) {
+      handleRequestCamera();
+    }
+  }, [enableHandTracking, cameraRequested, handleRequestCamera]);
+
+  /** Handle hand gestures for map control */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !enableHandTracking || !gestureReady || !currentGesture) return;
+
+    const { gesture, landmarks } = currentGesture;
+
+    // Detect gesture changes
+    if (gesture !== lastGestureRef.current) {
+      lastGestureRef.current = gesture;
+      if (landmarks && landmarks.length > 0) {
+        gestureStartXRef.current = landmarks[0].x;
+        gestureStartYRef.current = landmarks[0].y;
+      }
+    }
+
+    switch (gesture) {
+      case "Closed_Fist": {
+        // Zoom in
+        const currentZoom = map.getZoom();
+        map.easeTo({ zoom: currentZoom + zoomSensitivity, duration: 100 });
+        break;
+      }
+
+      case "Open_Palm": {
+        // Zoom out
+        const currentZoom = map.getZoom();
+        map.easeTo({ zoom: currentZoom - zoomSensitivity, duration: 100 });
+        break;
+      }
+
+      case "Pointing_Up": {
+        // Rotate - track hand movement left/right (spin globe on its axis)
+        if (landmarks && landmarks.length > 0) {
+          const currentX = landmarks[0].x;
+          const deltaX = currentX - gestureStartXRef.current;
+          
+          // Apply horizontal rotation by changing longitude (inverted)
+          const rotationDelta = -deltaX * rotationSensitivity * 100;
+          const currentCenter = map.getCenter();
+          const newLng = currentCenter.lng + rotationDelta;
+          
+          map.easeTo({ 
+            center: [newLng, currentCenter.lat],
+            duration: 100 
+          });
+          
+          // Update reference position
+          gestureStartXRef.current = currentX;
+        }
+        break;
+      }
+
+      case "Victory": {
+        // Two fingers - vertical rotation (up/down)
+        if (landmarks && landmarks.length > 0) {
+          const currentY = landmarks[0].y;
+          const deltaY = currentY - gestureStartYRef.current;
+          
+          // Apply vertical rotation by changing latitude (inverted)
+          const rotationDelta = -deltaY * rotationSensitivity * 80;
+          const currentCenter = map.getCenter();
+          const newLat = Math.max(-85, Math.min(85, currentCenter.lat + rotationDelta)); // Clamp to valid range
+          
+          map.easeTo({ 
+            center: [currentCenter.lng, newLat],
+            duration: 100 
+          });
+          
+          // Update reference position
+          gestureStartYRef.current = currentY;
+        }
+        break;
+      }
+    }
+  }, [currentGesture, enableHandTracking, gestureReady, rotationSensitivity, zoomSensitivity]);
 
   /** Offset coordinates to prevent overlapping markers with different patterns for each type */
   const offsetDuplicateCoordinates = (lat: number, lng: number, markerType: 'vc' | 'competitor' | 'cofounder' = 'vc') => {
@@ -789,6 +909,64 @@ export default function AudienceMap({
       )}
 
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+
+      {/* Sensitivity Controls */}
+      {enableHandTracking && (
+        <div className="fixed right-4 top-4 z-[9998]">
+          <button
+            onClick={() => setShowSensitivityControls(!showSensitivityControls)}
+            className="rounded-lg bg-black/70 px-3 py-2 text-sm text-white backdrop-blur-md hover:bg-black/80"
+          >
+            ⚙️ Gesture Settings
+          </button>
+          
+          {showSensitivityControls && (
+            <div className="mt-2 w-64 space-y-4 rounded-lg bg-black/70 p-4 backdrop-blur-md">
+              <h3 className="text-sm font-semibold text-white">Sensitivity Controls</h3>
+              
+              <Slider
+                value={rotationSensitivity}
+                onChange={setRotationSensitivity}
+                min={0.1}
+                max={5}
+                step={0.1}
+                label="Rotation Sensitivity"
+              />
+              
+              <Slider
+                value={zoomSensitivity}
+                onChange={setZoomSensitivity}
+                min={0.005}
+                max={0.2}
+                step={0.005}
+                label="Zoom Sensitivity"
+              />
+              
+              <button
+                onClick={() => {
+                  setRotationSensitivity(0.5);
+                  setZoomSensitivity(0.05);
+                }}
+                className="w-full rounded bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600"
+              >
+                Reset to Defaults
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hand Tracking Overlay */}
+      {enableHandTracking && (
+        <HandTrackingOverlay
+          gesture={currentGesture}
+          isReady={gestureReady}
+          error={gestureError}
+          videoRef={videoRef}
+          onRequestCamera={handleRequestCamera}
+          showVideo={showVideoFeed}
+        />
+      )}
 
       {/* Unified Pin Sidebar */}
       <UnifiedPinSidebar
