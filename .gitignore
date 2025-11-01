@@ -2,6 +2,9 @@
 node_modules/
 .next/
 
+# Cesium assets (too large, installed via npm)
+frontend/public/cesium/
+
 # Environment variables (shared)
 .env
 .env.local

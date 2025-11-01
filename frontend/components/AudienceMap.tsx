@@ -876,31 +876,59 @@ export default function AudienceMap({
         shelters.forEach(shelter => {
           if (!shelter.latitude || !shelter.longitude) return;
 
-          // Create blue marker element - LARGE for visibility
+          // Create beautiful glass-style marker
           const el = document.createElement("div");
           el.className = "shelter-marker";
-          el.style.width = "40px";
-          el.style.height = "40px";
+          el.style.width = "16px";
+          el.style.height = "16px";
           el.style.borderRadius = "50%";
-          el.style.backgroundColor = "#00FFFF"; // Cyan/bright blue
-          el.style.border = "4px solid #FF0000"; // RED border so we can't miss it
-          el.style.boxShadow = "0 4px 16px rgba(0,255,255,0.8)";
+          el.style.background = "radial-gradient(circle, rgba(0,217,255,1) 0%, rgba(0,150,255,0.8) 50%, rgba(0,100,200,0.3) 100%)";
+          el.style.border = "2px solid rgba(255, 255, 255, 0.7)";
+          el.style.boxShadow = "0 0 20px rgba(0, 217, 255, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.4)";
           el.style.cursor = "pointer";
+          el.style.backdropFilter = "blur(4px)";
           el.style.zIndex = "1000";
 
-          console.log("Creating marker for:", shelter.name, "at", [shelter.longitude, shelter.latitude]);
+          console.log("Creating glass marker for:", shelter.name, "at", [shelter.longitude, shelter.latitude]);
 
           const marker = new mapboxgl.Marker({ element: el })
             .setLngLat([shelter.longitude, shelter.latitude])
             .setPopup(
-              new mapboxgl.Popup({ offset: 25 }).setHTML(
-                `<div style="padding: 10px;">
-                  <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">${shelter.name}</h3>
-                  <p style="margin: 4px 0; font-size: 12px;"><strong>Address:</strong> ${shelter.address}, ${shelter.city}, ${shelter.state}</p>
-                  <p style="margin: 4px 0; font-size: 12px;"><strong>Status:</strong> ${shelter.status}</p>
-                  <p style="margin: 4px 0; font-size: 12px;"><strong>Organization:</strong> ${shelter.organization || "N/A"}</p>
-                  <p style="margin: 4px 0; font-size: 12px;"><strong>Capacity:</strong> ${shelter.evacuation_capacity || "N/A"}</p>
-                  <p style="margin: 4px 0; font-size: 12px;"><strong>Current Population:</strong> ${shelter.current_population || 0}</p>
+              new mapboxgl.Popup({
+                offset: 25,
+                className: 'shelter-popup',
+                maxWidth: '280px'
+              }).setHTML(
+                `<div style="
+                  background: rgba(0, 0, 0, 0.85);
+                  backdrop-filter: blur(16px);
+                  padding: 16px;
+                  border-radius: 12px;
+                  border: 1px solid rgba(0, 217, 255, 0.3);
+                ">
+                  <h3 style="
+                    margin: 0 0 10px 0;
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #00D9FF;
+                    text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+                  ">${shelter.name}</h3>
+                  <p style="margin: 6px 0; font-size: 12px; color: #E0E0E0;">
+                    📍 ${shelter.address}<br/>
+                    ${shelter.city}, ${shelter.state} ${shelter.zip}
+                  </p>
+                  <div style="
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #B0B0B0;
+                    font-size: 11px;
+                  ">
+                    <p style="margin: 4px 0;">🟢 Status: <span style="color: #4ADE80;">${shelter.status}</span></p>
+                    <p style="margin: 4px 0;">🏢 ${shelter.organization || "N/A"}</p>
+                    <p style="margin: 4px 0;">👥 Capacity: ${shelter.evacuation_capacity || "N/A"}</p>
+                    <p style="margin: 4px 0;">📊 Current: ${shelter.current_population || 0} people</p>
+                  </div>
                 </div>`
               )
             )

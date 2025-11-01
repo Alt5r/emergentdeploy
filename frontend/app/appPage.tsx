@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import AudienceMap from "@/components/AudienceMap";
+import CesiumGlobeSimple from "@/components/CesiumGlobeSimple";
 import { FieldSwitch } from "@/components/fieldSwitch";
 import { InputGroup, InputGroupButton, InputGroupAddon, InputGroupText, InputGroupTextarea, InputGroupInput } from "@/components/ui/input-group";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -543,20 +543,7 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
         </InputGroup>
       </div>
       <div className="absolute inset-0 w-full h-full">
-        <AudienceMap
-          showVCs={showVCs}
-          showCompetitors={showCompetitors}
-          showDemographics={showDemographics}
-          showCofounders={showCofounders}
-          showCrisisEvents={showCrisisEvents}
-          competitorsData={competitorsData}
-          vcsData={vcsData}
-          cofoundersData={cofoundersData}
-          demographicsData={demographicsData}
-          crisisEventsData={crisisEventsData}
-          enableHandTracking={true}
-          showVideoFeed={false}
-        />
+        <CesiumGlobeSimple className="w-full h-full" />
       </div>
     </div>
   );

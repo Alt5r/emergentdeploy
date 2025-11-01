@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "cp -r node_modules/cesium/Build/Cesium public/cesium || true"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
@@ -20,10 +21,12 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
+    "cesium": "^1.134.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cobe": "^0.6.5",
     "framer-motion": "^12.23.24",
+    "globe.gl": "^2.45.0",
     "lucide-react": "^0.546.0",
     "mapbox-gl": "^3.15.0",
     "motion": "^12.23.24",
@@ -31,6 +34,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^2.15.4",
+    "resium": "^1.19.0-beta.1",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
