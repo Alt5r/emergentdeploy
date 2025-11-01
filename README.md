@@ -17,12 +17,26 @@ Emergent aggregates disaster-related news from reliable sources including major 
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+- **Python 3.12** (required)
+
+### 1. Set Up Virtual Environment
+```bash
+# Create virtual environment with Python 3.12
+python3.12 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On macOS/Linux
+# or
+venv\Scripts\activate  # On Windows
+```
+
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run the API Server
+### 3. Run the API Server
 ```bash
 # From project root
 python backend/app/main.py
@@ -31,12 +45,12 @@ python backend/app/main.py
 uvicorn backend.app.main:app --reload
 ```
 
-### 3. Access the API
+### 4. Access the API
 - API Base: http://localhost:8000
 - Interactive Docs: http://localhost:8000/docs
 - API Documentation: http://localhost:8000/redoc
 
-### 4. Try Sample Requests
+### 5. Try Sample Requests
 ```bash
 # Get all verified events
 curl http://localhost:8000/api/v1/events
@@ -100,10 +114,12 @@ Edit `backend/config.py` to customize:
 
 ## Tech Stack
 
+- **Python 3.12** - Core language
 - **FastAPI** - Modern web framework
 - **feedparser** - RSS feed parsing
 - **geopy** - Geocoding (Nominatim/OSM)
 - **Pydantic** - Data validation
+- **spaCy** - Natural language processing
 - **uvicorn** - ASGI server
 
 ## Contributing

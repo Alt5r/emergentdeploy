@@ -61,9 +61,13 @@ type AudienceMapProps = {
 const LIGHT_STYLE = "mapbox://styles/mapbox/standard";
 /** Dark theme you like */
 const DARK_STYLE = "mapbox://styles/mapbox/dark-v11";
+/** Satellite view */
+const SATELLITE_STYLE = "mapbox://styles/mapbox/satellite-streets-v12";
+/** Pure satellite (no labels) */
+const SATELLITE_PURE = "mapbox://styles/mapbox/satellite-v9";
 
 /** Default initial style */
-const DEFAULT_STYLE = DARK_STYLE;
+const DEFAULT_STYLE = SATELLITE_STYLE;
 
 /** Dev token fallback — replace with your env if you prefer */
 const envToken =
@@ -101,6 +105,7 @@ export default function AudienceMap({
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [selectedPinData, setSelectedPinData] = useState<unknown>(null);
+  const [showStyleSelector, setShowStyleSelector] = useState(false);
   
   // Hand tracking state
   const [cameraRequested, setCameraRequested] = useState(false);
@@ -942,6 +947,16 @@ export default function AudienceMap({
     }
   }, [showDemographics, heatmapData, addHeatmapLayer, removeHeatmapLayer, marketAnalysisData, handlePinClick]);
 
+  /** Change map style */
+  const handleStyleChange = (newStyle: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    setStyleUrl(newStyle);
+    map.setStyle(newStyle); // 'style.load' handler will re-apply globe + optional 3D layer
+    setShowStyleSelector(false);
+  };
+
   /** Toggle styles using setStyle (no re-init) and preserve globe */
   const handleToggleTheme = () => {
     const map = mapRef.current;
@@ -983,9 +998,56 @@ export default function AudienceMap({
 
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
+      {/* Map Style Selector */}
+      <div className="fixed right-4 top-4 z-[9998] space-y-2">
+        <button
+          onClick={() => setShowStyleSelector(!showStyleSelector)}
+          className="w-full rounded-lg bg-black/70 px-3 py-2 text-sm text-white backdrop-blur-md hover:bg-black/80"
+        >
+          🗺️ Map Style
+        </button>
+        
+        {showStyleSelector && (
+          <div className="w-48 space-y-1 rounded-lg bg-black/70 p-2 backdrop-blur-md">
+            <button
+              onClick={() => handleStyleChange(DARK_STYLE)}
+              className={`w-full rounded px-3 py-2 text-left text-xs text-white transition ${
+                styleUrl === DARK_STYLE ? "bg-blue-500" : "hover:bg-white/10"
+              }`}
+            >
+              🌑 Dark
+            </button>
+            <button
+              onClick={() => handleStyleChange(LIGHT_STYLE)}
+              className={`w-full rounded px-3 py-2 text-left text-xs text-white transition ${
+                styleUrl === LIGHT_STYLE ? "bg-blue-500" : "hover:bg-white/10"
+              }`}
+            >
+              🌍 Globe (Light)
+            </button>
+            <button
+              onClick={() => handleStyleChange(SATELLITE_STYLE)}
+              className={`w-full rounded px-3 py-2 text-left text-xs text-white transition ${
+                styleUrl === SATELLITE_STYLE ? "bg-blue-500" : "hover:bg-white/10"
+              }`}
+            >
+              🛰️ Satellite + Streets
+            </button>
+            <button
+              onClick={() => handleStyleChange(SATELLITE_PURE)}
+              className={`w-full rounded px-3 py-2 text-left text-xs text-white transition ${
+                styleUrl === SATELLITE_PURE ? "bg-blue-500" : "hover:bg-white/10"
+              }`}
+            >
+              📡 Satellite Only
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Sensitivity Controls */}
       {enableHandTracking && (
-        <div className="fixed right-4 top-4 z-[9998]">
+        <div className="fixed right-4 top-20 z-[9998]">
           <button
             onClick={() => setShowSensitivityControls(!showSensitivityControls)}
             className="rounded-lg bg-black/70 px-3 py-2 text-sm text-white backdrop-blur-md hover:bg-black/80"
