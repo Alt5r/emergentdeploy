@@ -1,0 +1,503 @@
+{
+  "status": "success",
+  "total_stations_analyzed": 55,
+  "events_detected": 0,
+  "triggered_buoys": [],
+  "all_stations": [
+    {
+      "station_id": "21413",
+      "coordinates": {
+        "latitude": 30.487,
+        "longitude": 152.124
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "21414",
+      "coordinates": {
+        "latitude": 48.97,
+        "longitude": 178.165
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "21415",
+      "coordinates": {
+        "latitude": 50.12,
+        "longitude": 171.867
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "21416",
+      "coordinates": {
+        "latitude": 48.126,
+        "longitude": 163.355
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "21419",
+      "coordinates": {
+        "latitude": 44.401,
+        "longitude": 155.653
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "21420",
+      "coordinates": {
+        "latitude": 28.98,
+        "longitude": 134.973
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "23223",
+      "coordinates": {
+        "latitude": 17.333,
+        "longitude": 89.483
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "23228",
+      "coordinates": {
+        "latitude": 20.764,
+        "longitude": 65.284
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "23401",
+      "coordinates": {
+        "latitude": 8.86,
+        "longitude": 88.55
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "23461",
+      "coordinates": {
+        "latitude": 9.534,
+        "longitude": 95.669
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "32402",
+      "coordinates": {
+        "latitude": -26.743,
+        "longitude": -73.983
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "32403",
+      "coordinates": {
+        "latitude": -23.163,
+        "longitude": -72.037
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "32404",
+      "coordinates": {
+        "latitude": -32.13,
+        "longitude": -73.797
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "32413",
+      "coordinates": {
+        "latitude": -7.432,
+        "longitude": -93.464
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "34420",
+      "coordinates": {
+        "latitude": -35.758,
+        "longitude": -75.243
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "41420",
+      "coordinates": {
+        "latitude": 23.433,
+        "longitude": -67.386
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "41425",
+      "coordinates": {
+        "latitude": 28.639,
+        "longitude": -65.774
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "42407",
+      "coordinates": {
+        "latitude": 15.276,
+        "longitude": -68.191
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "42409",
+      "coordinates": {
+        "latitude": 25.799,
+        "longitude": -89.291
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "43412",
+      "coordinates": {
+        "latitude": 16.02,
+        "longitude": -107.0
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "43413",
+      "coordinates": {
+        "latitude": 10.927,
+        "longitude": -100.012
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "44402",
+      "coordinates": {
+        "latitude": 39.314,
+        "longitude": -70.717
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "44403",
+      "coordinates": {
+        "latitude": 41.928,
+        "longitude": -61.664
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46403",
+      "coordinates": {
+        "latitude": 52.654,
+        "longitude": -156.813
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46404",
+      "coordinates": {
+        "latitude": 45.852,
+        "longitude": -128.745
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46407",
+      "coordinates": {
+        "latitude": 42.704,
+        "longitude": -128.895
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46409",
+      "coordinates": {
+        "latitude": 55.338,
+        "longitude": -148.575
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46410",
+      "coordinates": {
+        "latitude": 57.649,
+        "longitude": -143.769
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46411",
+      "coordinates": {
+        "latitude": 39.337,
+        "longitude": -127.04
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46413",
+      "coordinates": {
+        "latitude": 48.045,
+        "longitude": -173.897
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46414",
+      "coordinates": {
+        "latitude": 53.756,
+        "longitude": -152.456
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46415",
+      "coordinates": {
+        "latitude": 53.035,
+        "longitude": -139.884
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46416",
+      "coordinates": {
+        "latitude": 49.939,
+        "longitude": -134.427
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "46419",
+      "coordinates": {
+        "latitude": 48.815,
+        "longitude": -129.623
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "51407",
+      "coordinates": {
+        "latitude": 19.53,
+        "longitude": -156.601
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "51425",
+      "coordinates": {
+        "latitude": -9.511,
+        "longitude": -176.258
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "52402",
+      "coordinates": {
+        "latitude": 11.928,
+        "longitude": 153.876
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "52403",
+      "coordinates": {
+        "latitude": 4.018,
+        "longitude": 145.628
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "52405",
+      "coordinates": {
+        "latitude": 12.992,
+        "longitude": 132.232
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "52406",
+      "coordinates": {
+        "latitude": -5.374,
+        "longitude": 164.99
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "55012",
+      "coordinates": {
+        "latitude": -15.664,
+        "longitude": 158.453
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "55015",
+      "coordinates": {
+        "latitude": -46.956,
+        "longitude": 160.343
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "55023",
+      "coordinates": {
+        "latitude": -14.715,
+        "longitude": 153.537
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "56003",
+      "coordinates": {
+        "latitude": -15.019,
+        "longitude": 118.073
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "3202520",
+      "coordinates": {
+        "latitude": -4.148,
+        "longitude": -89.008
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401000",
+      "coordinates": {
+        "latitude": -38.2,
+        "longitude": -179.797
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401001",
+      "coordinates": {
+        "latitude": -36.049,
+        "longitude": -177.708
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401002",
+      "coordinates": {
+        "latitude": -29.683,
+        "longitude": -175.012
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401003",
+      "coordinates": {
+        "latitude": -23.352,
+        "longitude": -173.402
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401004",
+      "coordinates": {
+        "latitude": -20.088,
+        "longitude": -171.863
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5401005",
+      "coordinates": {
+        "latitude": -16.889,
+        "longitude": -171.191
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5501002",
+      "coordinates": {
+        "latitude": -42.371,
+        "longitude": 176.911
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5501004",
+      "coordinates": {
+        "latitude": -36.1,
+        "longitude": 178.604
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5501005",
+      "coordinates": {
+        "latitude": -26.667,
+        "longitude": 163.955
+      },
+      "status": "normal",
+      "event_details": null
+    },
+    {
+      "station_id": "5501006",
+      "coordinates": {
+        "latitude": -24.309,
+        "longitude": 169.499
+      },
+      "status": "normal",
+      "event_details": null
+    }
+  ]
+}
