@@ -5,6 +5,8 @@ import mapboxgl, { Map, Marker, LngLatBounds, FillExtrusionLayer } from "mapbox-
 import type { FeatureCollection, Feature, Point } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 import UnifiedPinSidebar, { transformMarketAnalysisToStats } from "./UnifiedPinSidebar";
+import { CrisisDetailModal } from "./CrisisDetailModal";
+import type { CrisisEvent } from "@/types/crisis";
 import { useHandGesture } from "@/hooks/useHandGesture";
 import { HandTrackingOverlay } from "./HandTrackingOverlay";
 import { Slider } from "@/components/ui/slider";
@@ -40,12 +42,14 @@ type AudienceMapProps = {
   showCompetitors?: boolean;
   showDemographics?: boolean;
   showCofounders?: boolean;
+  showCrisisEvents?: boolean;
   /** Data from API calls */
   competitorsData?: unknown;
   vcsData?: unknown;
   cofoundersData?: unknown;
   demographicsData?: unknown;
   marketAnalysisData?: unknown;
+  crisisEventsData?: unknown;
   /** Enable hand tracking controls */
   enableHandTracking?: boolean;
   /** Show video feed for hand tracking */
