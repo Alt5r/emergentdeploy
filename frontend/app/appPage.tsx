@@ -554,6 +554,8 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
           cofoundersData={cofoundersData}
           demographicsData={demographicsData}
           crisisEventsData={crisisEventsData}
+          enableHandTracking={true}
+          showVideoFeed={false}
         />
       </div>
     </div>

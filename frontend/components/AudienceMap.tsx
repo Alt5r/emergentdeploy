@@ -7,6 +7,10 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import UnifiedPinSidebar, { transformMarketAnalysisToStats } from "./UnifiedPinSidebar";
 import { CrisisDetailModal } from "./CrisisDetailModal";
 import type { CrisisEvent } from "@/types/crisis";
+import { useHandGesture } from "@/hooks/useHandGesture";
+import { HandTrackingOverlay } from "./HandTrackingOverlay";
+import { Slider } from "@/components/ui/slider";
+import { getShelters } from "@/lib/shelters-api";
 
 /** ---------- Types ---------- */
 type AudienceProps = {
@@ -46,6 +50,10 @@ type AudienceMapProps = {
   demographicsData?: unknown;
   marketAnalysisData?: unknown;
   crisisEventsData?: unknown;
+  /** Enable hand tracking controls */
+  enableHandTracking?: boolean;
+  /** Show video feed for hand tracking */
+  showVideoFeed?: boolean;
 };
 
 /** ---------- Styles ---------- */
@@ -71,7 +79,6 @@ export default function AudienceMap({
   cofoundersData,
   demographicsData,
   marketAnalysisData,
-  crisisEventsData,
   initialStyle = DEFAULT_STYLE,
   enableThemeToggle = false,
   style,
@@ -80,7 +87,8 @@ export default function AudienceMap({
   showCompetitors = true,
   showDemographics = true,
   showCofounders = true,
-  showCrisisEvents = true,
+  enableHandTracking = false,
+  showVideoFeed = false,
 }: AudienceMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -88,14 +96,32 @@ export default function AudienceMap({
   const vcMarkersRef = useRef<Marker[]>([]);
   const competitorMarkersRef = useRef<Marker[]>([]);
   const cofounderMarkersRef = useRef<Marker[]>([]);
-  const crisisMarkersRef = useRef<Marker[]>([]);
-  const heatmapListenerAddedRef = useRef(false);
+  const shelterMarkersRef = useRef<Marker[]>([]);
   const [styleUrl, setStyleUrl] = useState<string>(initialStyle);
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [selectedPinData, setSelectedPinData] = useState<unknown>(null);
-  const [selectedCrisisEvent, setSelectedCrisisEvent] = useState<CrisisEvent | null>(null);
-  const [isCrisisModalOpen, setIsCrisisModalOpen] = useState(false);
+  
+  // Hand tracking state
+  const [cameraRequested, setCameraRequested] = useState(false);
+  const [rotationSensitivity, setRotationSensitivity] = useState(0.5);
+  const [zoomSensitivity, setZoomSensitivity] = useState(0.05);
+  const [showSensitivityControls, setShowSensitivityControls] = useState(false);
+  const lastGestureRef = useRef<string>("None");
+  const gestureStartXRef = useRef<number>(0);
+  const gestureStartYRef = useRef<number>(0);
+
+  // Hand gesture detection
+  const {
+    isReady: gestureReady,
+    error: gestureError,
+    currentGesture,
+    videoRef,
+    initializeCamera,
+  } = useHandGesture({
+    enabled: enableHandTracking,
+    minConfidence: 0.65,
+  });
 
   /** Handle pin click to show sidebar */
   const handlePinClick = useCallback((pinData: unknown) => {
@@ -109,8 +135,98 @@ export default function AudienceMap({
     setSelectedPinData(null);
   }, []);
 
+  /** Request camera access */
+  const handleRequestCamera = useCallback(() => {
+    setCameraRequested(true);
+    initializeCamera();
+  }, [initializeCamera]);
+
+  /** Auto-initialize camera if hand tracking is enabled */
+  useEffect(() => {
+    if (enableHandTracking && !cameraRequested) {
+      handleRequestCamera();
+    }
+  }, [enableHandTracking, cameraRequested, handleRequestCamera]);
+
+  /** Handle hand gestures for map control */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !enableHandTracking || !gestureReady || !currentGesture) return;
+
+    const { gesture, landmarks } = currentGesture;
+
+    // Detect gesture changes
+    if (gesture !== lastGestureRef.current) {
+      lastGestureRef.current = gesture;
+      if (landmarks && landmarks.length > 0) {
+        gestureStartXRef.current = landmarks[0].x;
+        gestureStartYRef.current = landmarks[0].y;
+      }
+    }
+
+    switch (gesture) {
+      case "Closed_Fist": {
+        // Zoom in
+        const currentZoom = map.getZoom();
+        map.easeTo({ zoom: currentZoom + zoomSensitivity, duration: 100 });
+        break;
+      }
+
+      case "Open_Palm": {
+        // Zoom out
+        const currentZoom = map.getZoom();
+        map.easeTo({ zoom: currentZoom - zoomSensitivity, duration: 100 });
+        break;
+      }
+
+      case "Pointing_Up": {
+        // Rotate - track hand movement left/right (spin globe on its axis)
+        if (landmarks && landmarks.length > 0) {
+          const currentX = landmarks[0].x;
+          const deltaX = currentX - gestureStartXRef.current;
+          
+          // Apply horizontal rotation by changing longitude (inverted)
+          const rotationDelta = -deltaX * rotationSensitivity * 100;
+          const currentCenter = map.getCenter();
+          const newLng = currentCenter.lng + rotationDelta;
+          
+          map.easeTo({ 
+            center: [newLng, currentCenter.lat],
+            duration: 100 
+          });
+          
+          // Update reference position
+          gestureStartXRef.current = currentX;
+        }
+        break;
+      }
+
+      case "Victory": {
+        // Two fingers - vertical rotation (up/down)
+        if (landmarks && landmarks.length > 0) {
+          const currentY = landmarks[0].y;
+          const deltaY = currentY - gestureStartYRef.current;
+          
+          // Apply vertical rotation by changing latitude (inverted)
+          const rotationDelta = -deltaY * rotationSensitivity * 80;
+          const currentCenter = map.getCenter();
+          const newLat = Math.max(-85, Math.min(85, currentCenter.lat + rotationDelta)); // Clamp to valid range
+          
+          map.easeTo({ 
+            center: [currentCenter.lng, newLat],
+            duration: 100 
+          });
+          
+          // Update reference position
+          gestureStartYRef.current = currentY;
+        }
+        break;
+      }
+    }
+  }, [currentGesture, enableHandTracking, gestureReady, rotationSensitivity, zoomSensitivity]);
+
   /** Offset coordinates to prevent overlapping markers with different patterns for each type */
-  const offsetDuplicateCoordinates = (lat: number, lng: number, markerType: 'vc' | 'competitor' | 'cofounder' | 'crisis' = 'vc') => {
+  const offsetDuplicateCoordinates = (lat: number, lng: number, markerType: 'vc' | 'competitor' | 'cofounder' = 'vc') => {
     const BASE_OFFSET = 0.03; // Base offset in degrees (~33 meters)
 
     // Different offset patterns for each marker type to ensure they don't overlap
@@ -118,7 +234,6 @@ export default function AudienceMap({
       vc: { lat: 0, lng: 0 }, // VCs stay at original position
       competitor: { lat: BASE_OFFSET, lng: BASE_OFFSET }, // Competitors offset northeast
       cofounder: { lat: -BASE_OFFSET, lng: BASE_OFFSET }, // Cofounders offset northwest
-      crisis: { lat: BASE_OFFSET, lng: -BASE_OFFSET }, // Crisis events offset southeast
     };
 
     const pattern = offsetPatterns[markerType];
@@ -133,7 +248,7 @@ export default function AudienceMap({
   };
 
   /** Load demographics data and update map */
-  const loadDemographicsData = useCallback((data: AudienceCollection, showDemographicsFlag: boolean, marketAnalysis: unknown) => {
+  const loadDemographicsData = useCallback((data: AudienceCollection, showDemographicsFlag: boolean, marketAnalysis: unknown, handlePinClickFn: (pinData: unknown) => void) => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -250,15 +365,15 @@ export default function AudienceMap({
               },
               marketStats: marketAnalysis ? transformMarketAnalysisToStats(marketAnalysis) : undefined
             };
-            handlePinClick(heatmapPinData);
+            handlePinClickFn(heatmapPinData);
           }
         });
       }
     }
-  }, [handlePinClick]);
+  }, []);
 
   /** Add heatmap layer for audience data */
-  const addHeatmapLayer = useCallback((marketAnalysis: unknown) => {
+  const addHeatmapLayer = useCallback((marketAnalysis: unknown, handlePinClickFn: (pinData: unknown) => void) => {
     const map = mapRef.current;
     if (!map || !heatmapData || !map.getSource("audience-heatmap")) return;
 
@@ -340,11 +455,11 @@ export default function AudienceMap({
             },
             marketStats: marketAnalysis ? transformMarketAnalysisToStats(marketAnalysis) : undefined
           };
-          handlePinClick(heatmapPinData);
+          handlePinClickFn(heatmapPinData);
         }
       });
     }
-  }, [heatmapData, handlePinClick]);
+  }, [heatmapData]);
 
   /** Remove heatmap layer */
   const removeHeatmapLayer = useCallback(() => {
@@ -444,7 +559,7 @@ export default function AudienceMap({
       markersRef.current.forEach((m) => m.addTo(map));
       // Re-add heatmap if demographics enabled and data exists
       if (showDemographics && heatmapData) {
-        addHeatmapLayer(marketAnalysisData);
+        addHeatmapLayer(marketAnalysisData, handlePinClick);
       }
     });
 
@@ -455,7 +570,7 @@ export default function AudienceMap({
 
         // If demographics data is available, load it immediately
         if (demographicsData) {
-          loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData);
+          loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData, handlePinClick);
         }
       } catch (err) {
         console.error("Error in map load:", err);
@@ -557,7 +672,7 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying VCs:", error);
     }
-  }, [showVCs, vcsData]);
+  }, [showVCs, vcsData, handlePinClick]);
 
   /** Handle Competitor toggle - display competitors as pins */
   useEffect(() => {
@@ -641,7 +756,7 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying competitors:", error);
     }
-  }, [showCompetitors, competitorsData]);
+  }, [showCompetitors, competitorsData, handlePinClick]);
 
   /** Handle Cofounder toggle - display cofounders as pins */
   useEffect(() => {
@@ -721,236 +836,111 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying cofounders:", error);
     }
-  }, [showCofounders, cofoundersData]);
+  }, [showCofounders, cofoundersData, handlePinClick]);
 
-  /** Handle Crisis Events toggle - display crisis events as pins */
+  /** Handle demographics data changes */
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    // Remove existing crisis event markers
-    crisisMarkersRef.current.forEach((m) => m.remove());
-    crisisMarkersRef.current = [];
-
-    if (!showCrisisEvents || !crisisEventsData || !Array.isArray(crisisEventsData)) return;
-
-    console.log("Displaying crisis events on map:", crisisEventsData);
-
-    try {
-      // Add crisis event markers to the map
-      crisisEventsData.forEach((event: CrisisEvent) => {
-        const { event_id, title, locations, confidence_score, description, published, source_count, sources, verified_at, location_text } = event;
-
-        if (!locations || locations.length === 0) return;
-
-        // Display marker for each location
-        locations.forEach((location) => {
-          if (!location?.latitude || !location?.longitude) return;
-
-          // Determine color based on confidence score
-          let markerColor = '#ef4444'; // red for low
-          if (confidence_score >= 0.8) {
-            markerColor = '#22c55e'; // green for high
-          } else if (confidence_score >= 0.6) {
-            markerColor = '#eab308'; // yellow for medium
-          }
-
-          // Create a custom crisis event marker element
-          const el = document.createElement("div");
-          el.className = "crisis-marker";
-          el.style.cssText = `
-            background-color: ${markerColor};
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
-          `;
-          el.innerHTML = `
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-              <path d="M12 9v4"></path>
-              <path d="M12 17h.01"></path>
-            </svg>
-          `;
-
-          // Add hover effect
-          el.addEventListener('mouseenter', () => {
-            el.style.transform = 'scale(1.2)';
-          });
-          el.addEventListener('mouseleave', () => {
-            el.style.transform = 'scale(1)';
-          });
-
-          const [lng, lat] = offsetDuplicateCoordinates(
-            location.latitude,
-            location.longitude,
-            'crisis'
-          );
-
-          const marker = new mapboxgl.Marker({ element: el, draggable: false })
-            .setLngLat([lng, lat])
-            .addTo(map);
-
-          // Add click handler to open modal with full event data
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setSelectedCrisisEvent(event);
-            setIsCrisisModalOpen(true);
-          });
-
-          crisisMarkersRef.current.push(marker);
-        });
-      });
-    } catch (error) {
-      console.error("Error displaying crisis events:", error);
-    }
-  }, [showCrisisEvents, crisisEventsData]);
-
-  /** Handle demographics data and toggle */
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    // Clear existing markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    // If demographics data is provided and we should show it
-    if (showDemographics && demographicsData) {
+    if (demographicsData && mapRef.current) {
       console.log("Demographics data received, loading into map:", demographicsData);
-      const data = demographicsData as AudienceCollection;
+      loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData, handlePinClick);
+    }
+  }, [demographicsData, showDemographics, marketAnalysisData, handlePinClick, loadDemographicsData]);
 
-      // Fit bounds / center
-      const coords = data.features.map((f) => f.geometry.coordinates);
-      if (coords.length > 1) {
-        const bounds = new LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]);
-        coords.forEach((c) => bounds.extend(c as [number, number]));
-        map.fitBounds(bounds, { padding: 100, duration: 1200 });
-      } else if (coords.length === 1) {
-        map.setCenter(coords[0] as [number, number]);
-        map.setZoom(10);
+  /** Load FEMA shelter data */
+  useEffect(() => {
+    async function loadShelters() {
+      const map = mapRef.current;
+      if (!map) return;
+
+      // Wait for map to be fully loaded
+      if (!map.loaded()) {
+        map.once('load', () => loadShelters());
+        return;
       }
+
+      try {
+        console.log("Loading FEMA shelters...");
+        const shelters = await getShelters(); // Get all shelters
+        console.log("Loaded shelters:", shelters);
+
+        // Clear existing shelter markers
+        shelterMarkersRef.current.forEach(m => m.remove());
+        shelterMarkersRef.current = [];
+
+        // Create markers for each shelter
+        shelters.forEach(shelter => {
+          if (!shelter.latitude || !shelter.longitude) return;
+
+          // Create blue marker element - LARGE for visibility
+          const el = document.createElement("div");
+          el.className = "shelter-marker";
+          el.style.width = "40px";
+          el.style.height = "40px";
+          el.style.borderRadius = "50%";
+          el.style.backgroundColor = "#00FFFF"; // Cyan/bright blue
+          el.style.border = "4px solid #FF0000"; // RED border so we can't miss it
+          el.style.boxShadow = "0 4px 16px rgba(0,255,255,0.8)";
+          el.style.cursor = "pointer";
+          el.style.zIndex = "1000";
+
+          console.log("Creating marker for:", shelter.name, "at", [shelter.longitude, shelter.latitude]);
+
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([shelter.longitude, shelter.latitude])
+            .setPopup(
+              new mapboxgl.Popup({ offset: 25 }).setHTML(
+                `<div style="padding: 10px;">
+                  <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">${shelter.name}</h3>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Address:</strong> ${shelter.address}, ${shelter.city}, ${shelter.state}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Status:</strong> ${shelter.status}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Organization:</strong> ${shelter.organization || "N/A"}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Capacity:</strong> ${shelter.evacuation_capacity || "N/A"}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Current Population:</strong> ${shelter.current_population || 0}</p>
+                </div>`
+              )
+            )
+            .addTo(mapRef.current!);
+
+          shelterMarkersRef.current.push(marker);
+        });
+
+        console.log(`Added ${shelters.length} shelter markers to map`);
+      } catch (error) {
+        console.error("Failed to load shelters:", error);
+      }
+    }
+
+    loadShelters();
+  }, []);
+
+  /** Handle demographics toggle - show heatmap when demographics is enabled */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (showDemographics && heatmapData) {
+      // Clear any existing markers when demographics is enabled
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
 
       // Remove existing heatmap first
-      if (map.getLayer("audience-heatmap-layer")) {
-        map.removeLayer("audience-heatmap-layer");
-      }
-      if (map.getSource("audience-heatmap")) {
-        map.removeSource("audience-heatmap");
-      }
+      removeHeatmapLayer();
 
       // Add heatmap source
       map.addSource("audience-heatmap", {
         type: "geojson",
-        data: data,
+        data: heatmapData,
       });
 
       // Add heatmap layer
-      map.addLayer({
-        id: "audience-heatmap-layer",
-        type: "heatmap",
-        source: "audience-heatmap",
-        maxzoom: 15,
-        paint: {
-          "heatmap-weight": [
-            "interpolate",
-            ["linear"],
-            ["get", "weight"],
-            0,
-            0,
-            1,
-            1,
-          ],
-          "heatmap-intensity": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            0,
-            1,
-            15,
-            3,
-          ],
-          "heatmap-color": [
-            "interpolate",
-            ["linear"],
-            ["heatmap-density"],
-            0,
-            "rgba(0, 0, 255, 0)",
-            0.1,
-            "rgb(0, 0, 255)",
-            0.3,
-            "rgb(0, 255, 0)",
-            0.5,
-            "rgb(255, 255, 0)",
-            0.7,
-            "rgb(255, 165, 0)",
-            1,
-            "rgb(255, 0, 0)",
-          ],
-          "heatmap-radius": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            0,
-            20,
-            15,
-            60,
-          ],
-          "heatmap-opacity": 0.6,
-        },
-      });
-
-      // Add cursor pointer for clickable heatmap
-      map.getCanvas().style.cursor = "pointer";
-
-      // Add click interactions for heatmap (only once)
-      if (!heatmapListenerAddedRef.current) {
-        map.on("click", "audience-heatmap-layer", (e) => {
-          e.preventDefault();
-          e.originalEvent.stopPropagation();
-          if (e.features && e.features.length > 0) {
-            const feature = e.features[0] as unknown as AudienceFeature;
-            // Convert heatmap feature to pin data format
-            const heatmapPinData = {
-              type: 'audience',
-              name: feature.properties?.name || 'Audience Member',
-              location: feature.properties?.display_name || feature.properties?.area_code || 'Unknown Location',
-              description: feature.properties?.description,
-              target_fit: feature.properties?.target_fit,
-              weight: feature.properties?.weight || 1,
-              coordinates: {
-                latitude: feature.geometry.coordinates[1],
-                longitude: feature.geometry.coordinates[0]
-              },
-              marketStats: marketAnalysisData ? transformMarketAnalysisToStats(marketAnalysisData) : undefined
-            };
-            handlePinClick(heatmapPinData);
-          }
-        });
-        heatmapListenerAddedRef.current = true;
-      }
-
-      // Store data for use in other effects
-      setHeatmapData(data);
+      addHeatmapLayer(marketAnalysisData, handlePinClick);
     } else {
-      // When demographics is disabled, remove heatmap
-      if (map.getLayer("audience-heatmap-layer")) {
-        map.removeLayer("audience-heatmap-layer");
-      }
-      if (map.getSource("audience-heatmap")) {
-        map.removeSource("audience-heatmap");
-      }
-      setHeatmapData(null);
-      heatmapListenerAddedRef.current = false;
+      // When demographics is disabled, remove heatmap and clear all markers
+      removeHeatmapLayer();
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demographicsData, showDemographics, marketAnalysisData]);
+  }, [showDemographics, heatmapData, addHeatmapLayer, removeHeatmapLayer, marketAnalysisData, handlePinClick]);
 
   /** Toggle styles using setStyle (no re-init) and preserve globe */
   const handleToggleTheme = () => {
@@ -993,6 +983,64 @@ export default function AudienceMap({
 
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
+      {/* Sensitivity Controls */}
+      {enableHandTracking && (
+        <div className="fixed right-4 top-4 z-[9998]">
+          <button
+            onClick={() => setShowSensitivityControls(!showSensitivityControls)}
+            className="rounded-lg bg-black/70 px-3 py-2 text-sm text-white backdrop-blur-md hover:bg-black/80"
+          >
+            ⚙️ Gesture Settings
+          </button>
+          
+          {showSensitivityControls && (
+            <div className="mt-2 w-64 space-y-4 rounded-lg bg-black/70 p-4 backdrop-blur-md">
+              <h3 className="text-sm font-semibold text-white">Sensitivity Controls</h3>
+              
+              <Slider
+                value={rotationSensitivity}
+                onChange={setRotationSensitivity}
+                min={0.1}
+                max={5}
+                step={0.1}
+                label="Rotation Sensitivity"
+              />
+              
+              <Slider
+                value={zoomSensitivity}
+                onChange={setZoomSensitivity}
+                min={0.005}
+                max={0.2}
+                step={0.005}
+                label="Zoom Sensitivity"
+              />
+              
+              <button
+                onClick={() => {
+                  setRotationSensitivity(0.5);
+                  setZoomSensitivity(0.05);
+                }}
+                className="w-full rounded bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600"
+              >
+                Reset to Defaults
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hand Tracking Overlay */}
+      {enableHandTracking && (
+        <HandTrackingOverlay
+          gesture={currentGesture}
+          isReady={gestureReady}
+          error={gestureError}
+          videoRef={videoRef}
+          onRequestCamera={handleRequestCamera}
+          showVideo={showVideoFeed}
+        />
+      )}
+
       {/* Unified Pin Sidebar */}
       <UnifiedPinSidebar
         pinData={selectedPinData as never}
@@ -1000,13 +1048,6 @@ export default function AudienceMap({
         onClose={handleSidebarClose}
         position="left"
         width="400px"
-      />
-
-      {/* Crisis Event Detail Modal */}
-      <CrisisDetailModal
-        event={selectedCrisisEvent}
-        isOpen={isCrisisModalOpen}
-        onClose={() => setIsCrisisModalOpen(false)}
       />
     </div>
   );
