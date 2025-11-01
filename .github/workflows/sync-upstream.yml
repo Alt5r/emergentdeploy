@@ -1,0 +1,66 @@
+name: Sync from Upstream
+
+on:
+  # Run every hour to check for changes
+  schedule:
+    - cron: '0 * * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push changes to the repository
+    
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          ref: main  # Always sync to main branch
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/sl1nabd/Emergent.git || true
+          git remote -v
+      
+      - name: Fetch upstream changes
+        run: |
+          git fetch upstream main
+      
+      - name: Check for changes and merge
+        id: merge
+        run: |
+          # Check if there are any changes to merge
+          UPSTREAM_HEAD=$(git rev-parse upstream/main)
+          CURRENT_HEAD=$(git rev-parse HEAD)
+          
+          if [ "$UPSTREAM_HEAD" = "$CURRENT_HEAD" ]; then
+            echo "No changes to merge"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Try to merge changes from upstream
+          # Note: --allow-unrelated-histories is used in case repositories don't share common history
+          # Remove this flag if repositories are known to share history
+          if git merge upstream/main --no-edit --allow-unrelated-histories; then
+            echo "Successfully merged upstream changes"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "Merge conflict detected. Please resolve manually."
+            exit 1
+          fi
+      
+      - name: Push changes
+        if: steps.merge.outputs.has_changes == 'true'
+        run: |
+          git push origin main
