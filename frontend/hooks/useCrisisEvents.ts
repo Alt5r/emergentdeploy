@@ -68,7 +68,8 @@ export function useCrisisEvents(options: UseCrisisEventsOptions = {}) {
   // Initial load
   useEffect(() => {
     loadEvents(true);
-  }, [loadEvents]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-refresh setup
   useEffect(() => {
