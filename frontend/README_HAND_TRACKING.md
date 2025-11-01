@@ -1,6 +1,6 @@
 # Hand Tracking Integration for Globe Component
 
-This integration adds MediaPipe-powered hand gesture controls to the Globe component, based on the [rca-hack project](https://github.com/snowcodeer/rca-hack).
+This integration adds MediaPipe-powered hand gesture controls to the Globe component, based on the (https://github.com/snowcodeer/rca-hack).
 
 ## Features
 
@@ -115,7 +115,7 @@ Visit `/globe-demo` to see the hand tracking in action.
 
 ## Credits
 
-- Hand tracking system inspired by [rca-hack](https://github.com/snowcodeer/rca-hack)
+- Hand tracking system inspired by 
 - Powered by [MediaPipe](https://developers.google.com/mediapipe)
 - Globe rendering by [COBE](https://github.com/shuding/cobe)
 
