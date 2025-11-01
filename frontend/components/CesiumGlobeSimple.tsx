@@ -12,6 +12,8 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
   const [shelters, setShelters] = useState<Shelter[]>([]);
+  const [storms, setStorms] = useState<any[]>([]);
+  const [tsunamiStations, setTsunamiStations] = useState<any[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [cssLoaded, setCssLoaded] = useState(false);
 
@@ -30,18 +32,32 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
     };
   }, []);
 
-  // Fetch shelter data
+  // Fetch all data
   useEffect(() => {
-    async function loadShelters() {
+    async function loadAllData() {
       try {
-        const data = await getShelters();
-        console.log("Shelters loaded for Cesium:", data);
-        setShelters(data);
+        // Load shelters
+        const shelterData = await getShelters();
+        console.log("Shelters loaded:", shelterData);
+        setShelters(shelterData);
+
+        // Load tropical storms
+        const stormResponse = await fetch('http://localhost:8000/api/v1/storms');
+        const stormData = await stormResponse.json();
+        console.log("Storms loaded:", stormData);
+        setStorms(stormData.storms || []);
+
+        // Load tsunami stations
+        const tsunamiResponse = await fetch('http://localhost:8000/api/v1/tsunami/stations');
+        const tsunamiData = await tsunamiResponse.json();
+        console.log("Tsunami stations loaded:", tsunamiData);
+        setTsunamiStations(tsunamiData.stations || []);
+
       } catch (error) {
-        console.error("Failed to load shelters:", error);
+        console.error("Failed to load data:", error);
       }
     }
-    loadShelters();
+    loadAllData();
   }, []);
 
   // Initialize Cesium
@@ -149,8 +165,93 @@ export default function CesiumGlobeSimple({ className }: { className?: string })
       });
 
       console.log(`Added ${shelters.length} shelter entities`);
+
+      // Add tropical storm/hurricane entities
+      if (storms.length > 0) {
+        console.log("Adding storm entities:", storms);
+
+        storms.forEach(storm => {
+          // Parse coordinates
+          const lat = parseFloat(storm.latitude);
+          const lon = -Math.abs(parseFloat(storm.longitude)); // West is negative
+
+          // Color based on category
+          const getStormColor = (severity: string) => {
+            if (severity.includes('Category 5') || severity.includes('Category 4')) {
+              return Cesium.Color.RED;
+            } else if (severity.includes('Category 3')) {
+              return Cesium.Color.ORANGE;
+            } else if (severity.includes('Category 2') || severity.includes('Category 1')) {
+              return Cesium.Color.YELLOW;
+            }
+            return Cesium.Color.CYAN;
+          };
+
+          const stormColor = getStormColor(storm.severity || '');
+
+          // Add hurricane marker with pulsing ring
+          viewer.entities.add({
+            name: `🌀 ${storm.name}`,
+            position: Cesium.Cartesian3.fromDegrees(lon, lat, 5000),
+            point: {
+              pixelSize: 20,
+              color: stormColor,
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 3,
+            },
+            ellipse: {
+              semiMinorAxis: 100000, // 100km radius
+              semiMajorAxis: 100000,
+              material: stormColor.withAlpha(0.2),
+              outline: true,
+              outlineColor: stormColor.withAlpha(0.6),
+              outlineWidth: 2,
+            },
+            description: `
+              <div style="padding: 16px;">
+                <h3 style="color: #ef4444; margin: 0 0 10px 0; font-weight: 700;">🌀 ${storm.classification} ${storm.name}</h3>
+                <p style="margin: 6px 0; color: #fca5a5; font-weight: 600;">${storm.severity}</p>
+                <p style="margin: 8px 0; color: #e5e7eb;">📍 Position: ${storm.latitude}, ${storm.longitude}</p>
+                <p style="margin: 6px 0; color: #e5e7eb;">💨 Winds: ${storm.wind_speed_kt} knots</p>
+                <p style="margin: 6px 0; color: #e5e7eb;">🌪️ Pressure: ${storm.pressure} mb</p>
+                <p style="margin: 6px 0; color: #e5e7eb;">➡️ Movement: ${storm.movement}</p>
+              </div>
+            `,
+          });
+        });
+
+        console.log(`Added ${storms.length} storm entities`);
+      }
+
+      // Add tsunami buoy stations
+      if (tsunamiStations.length > 0) {
+        console.log("Adding tsunami station entities:", tsunamiStations.length);
+
+        tsunamiStations.forEach(station => {
+          viewer.entities.add({
+            name: `🌊 DART ${station.station_id}`,
+            position: Cesium.Cartesian3.fromDegrees(station.longitude, station.latitude),
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.fromCssColorString('#06b6d4'), // Cyan for tsunami
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 1,
+            },
+            description: `
+              <div style="padding: 12px;">
+                <h3 style="color: #06b6d4; margin: 0 0 8px 0; font-weight: 600;">🌊 DART Station ${station.station_id}</h3>
+                <p style="margin: 4px 0; color: #e5e7eb;">📍 Tsunami Monitoring Buoy</p>
+                <p style="margin: 4px 0; color: #e5e7eb;">Lat: ${station.latitude.toFixed(3)}</p>
+                <p style="margin: 4px 0; color: #e5e7eb;">Lon: ${station.longitude.toFixed(3)}</p>
+              </div>
+            `,
+          });
+        });
+
+        console.log(`Added ${tsunamiStations.length} tsunami station entities`);
+      }
     });
-  }, [isLoaded, shelters]);
+  }, [isLoaded, shelters, storms, tsunamiStations]);
 
   return (
     <div

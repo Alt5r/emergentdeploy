@@ -332,6 +332,80 @@ async def get_california_shelters():
         raise HTTPException(status_code=500, detail="Failed to fetch California shelter data")
 
 
+# Tropical Storm endpoints
+@app.get("/api/v1/storms")
+async def get_active_storms():
+    """
+    Get active tropical storms and hurricanes
+
+    Returns storm data from NHC including position, intensity, and forecast
+    """
+    try:
+        import json
+        from pathlib import Path
+
+        storms_file = Path(__file__).parent.parent / "services" / "notifs" / "TS_data" / "active_storms_data.json"
+
+        if storms_file.exists():
+            with open(storms_file, 'r') as f:
+                storms = json.load(f)
+            return {
+                "status": "success",
+                "count": len(storms),
+                "storms": storms
+            }
+        else:
+            return {
+                "status": "success",
+                "count": 0,
+                "storms": []
+            }
+    except Exception as e:
+        logger.error(f"Error fetching storms: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch storm data")
+
+
+# Tsunami/DART station endpoints
+@app.get("/api/v1/tsunami/stations")
+async def get_dart_stations():
+    """
+    Get DART tsunami buoy station locations
+
+    Returns coordinates of all DART stations for tsunami monitoring
+    """
+    try:
+        import csv
+        from pathlib import Path
+
+        stations_file = Path(__file__).parent.parent / "services" / "notifs" / "T_data" / "dart_stations_coordinates.csv"
+
+        if stations_file.exists():
+            stations = []
+            with open(stations_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    stations.append({
+                        "station_id": row['station_id'],
+                        "latitude": float(row['latitude']),
+                        "longitude": float(row['longitude'])
+                    })
+
+            return {
+                "status": "success",
+                "count": len(stations),
+                "stations": stations
+            }
+        else:
+            return {
+                "status": "success",
+                "count": 0,
+                "stations": []
+            }
+    except Exception as e:
+        logger.error(f"Error fetching DART stations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch DART station data")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
