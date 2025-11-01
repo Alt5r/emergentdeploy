@@ -1,19 +1,20 @@
 """
-Vercel Entry Point - Root level app.py
-This is the primary entry point that Vercel searches for.
+Vercel Entry Point for FastAPI
+Vercel requires an ASGI application or handler function
 """
-
 import sys
-import os
 from pathlib import Path
 
-# Ensure we're in the right directory
-current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir))
-os.chdir(current_dir)
+# Add project root to Python path
+sys.path.insert(0, str(Path(__file__).parent))
 
-# Import the FastAPI application
+# Import the FastAPI app
 from backend.app.main import app
 
-# Vercel looks for 'app' variable
-__all__ = ["app"]
+# For Vercel Python runtime - expose as handler
+def handler(request):
+    """Vercel serverless function handler"""
+    return app
+
+# Also expose app directly for @vercel/python
+app = app

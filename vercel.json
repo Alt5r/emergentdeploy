@@ -1,15 +1,28 @@
 {
   "version": 2,
+  "buildCommand": "cd frontend && npm run build",
+  "devCommand": "cd frontend && npm run dev",
+  "installCommand": "cd frontend && npm install && cd .. && pip install -r requirements.txt",
+  "framework": "nextjs",
+  "outputDirectory": "frontend/.next",
   "builds": [
     {
-      "src": "app.py",
+      "src": "frontend/package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "api/*.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "app.py"
+      "dest": "frontend/$1"
     }
   ]
 }
