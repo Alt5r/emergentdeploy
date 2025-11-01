@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { useHandGesture } from "@/hooks/useHandGesture"
 import { useGlobeGestureControl } from "@/hooks/useGlobeGestureControl"
 import { HandTrackingOverlay } from "@/components/HandTrackingOverlay"
+import { getShelters } from "@/lib/shelters-api"
 
 const MOVEMENT_DAMPING = 1400
 
@@ -23,20 +24,9 @@ const GLOBE_CONFIG: COBEOptions = {
   mapSamples: 16000,
   mapBrightness: 1.2,
   baseColor: [1, 1, 1],
-  markerColor: [251 / 255, 100 / 255, 21 / 255],
+  markerColor: [0 / 255, 150 / 255, 255 / 255], // Blue for shelters
   glowColor: [1, 1, 1],
-  markers: [
-    { location: [14.5995, 120.9842], size: 0.03 },
-    { location: [19.076, 72.8777], size: 0.1 },
-    { location: [23.8103, 90.4125], size: 0.05 },
-    { location: [30.0444, 31.2357], size: 0.07 },
-    { location: [39.9042, 116.4074], size: 0.08 },
-    { location: [-23.5505, -46.6333], size: 0.1 },
-    { location: [19.4326, -99.1332], size: 0.1 },
-    { location: [40.7128, -74.006], size: 0.1 },
-    { location: [34.6937, 135.5022], size: 0.05 },
-    { location: [41.0082, 28.9784], size: 0.06 },
-  ],
+  markers: [], // Will be populated from API
 }
 
 export function Globe({
@@ -57,6 +47,26 @@ export function Globe({
   const pointerInteractionMovement = useRef(0)
 
   const [cameraRequested, setCameraRequested] = useState(false)
+  const [shelterMarkers, setShelterMarkers] = useState<Array<{ location: [number, number]; size: number }>>([])
+
+  // Fetch shelter data on mount
+  useEffect(() => {
+    async function loadShelters() {
+      try {
+        const shelters = await getShelters() // Get all shelters (will show CA when available)
+        console.log("Loaded shelters:", shelters)
+        const markers = shelters.map(shelter => ({
+          location: [shelter.latitude, shelter.longitude] as [number, number],
+          size: 0.1 // Larger size so it's visible
+        }))
+        setShelterMarkers(markers)
+        console.log("Shelter markers:", markers)
+      } catch (error) {
+        console.error("Failed to load shelters:", error)
+      }
+    }
+    loadShelters()
+  }, [])
 
   const r = useMotionValue(0)
   const rs = useSpring(r, {
@@ -151,6 +161,7 @@ export function Globe({
 
     const globe = createGlobe(canvasRef.current!, {
       ...config,
+      markers: shelterMarkers, // Use shelter markers from API
       width: widthRef.current * 2,
       height: widthRef.current * 2,
       onRender: (state) => {
@@ -169,7 +180,7 @@ export function Globe({
       globe.destroy()
       window.removeEventListener("resize", onResize)
     }
-  }, [rs, config])
+  }, [rs, config, shelterMarkers])
 
   return (
     <>

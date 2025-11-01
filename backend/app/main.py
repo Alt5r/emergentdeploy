@@ -9,11 +9,13 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from backend.config import API_CONFIG, LOGGING_CONFIG
 from backend.services.aggregator import get_verified_events, CrisisAggregator
+from backend.services.fema_shelters import FEMAShelterService
 
 # Configure logging
 logging.basicConfig(
@@ -29,8 +31,18 @@ app = FastAPI(
     version=API_CONFIG["version"]
 )
 
+# Add CORS middleware to allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Global aggregator instance (could be moved to dependency injection)
 aggregator = CrisisAggregator()
+fema_service = FEMAShelterService()
 
 
 # Pydantic models for API responses
@@ -238,6 +250,49 @@ async def plan_evacuation(event_id: str):
         "message": "Evacuation planner not yet implemented",
         "event_id": event_id
     }
+
+
+# FEMA Shelter endpoints
+@app.get("/api/v1/shelters")
+async def get_shelters(
+    state: Optional[str] = Query(None, description="Two-letter state code (e.g., CA, TX)"),
+    status: Optional[str] = Query(None, description="Shelter status (OPEN, CLOSED)")
+):
+    """
+    Get FEMA shelter data
+
+    Returns shelters filtered by state and/or status
+    """
+    try:
+        shelters = fema_service.get_shelters(state=state, status=status)
+        return {
+            "status": "success",
+            "count": len(shelters),
+            "shelters": shelters
+        }
+    except Exception as e:
+        logger.error(f"Error fetching shelters: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch shelter data")
+
+
+@app.get("/api/v1/shelters/california")
+async def get_california_shelters():
+    """
+    Get all shelters in California
+
+    Convenience endpoint for California-specific shelter data
+    """
+    try:
+        shelters = fema_service.get_california_shelters()
+        return {
+            "status": "success",
+            "state": "CA",
+            "count": len(shelters),
+            "shelters": shelters
+        }
+    except Exception as e:
+        logger.error(f"Error fetching California shelters: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch California shelter data")
 
 
 if __name__ == "__main__":

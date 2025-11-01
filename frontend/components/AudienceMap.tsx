@@ -8,6 +8,7 @@ import UnifiedPinSidebar, { transformMarketAnalysisToStats } from "./UnifiedPinS
 import { useHandGesture } from "@/hooks/useHandGesture";
 import { HandTrackingOverlay } from "./HandTrackingOverlay";
 import { Slider } from "@/components/ui/slider";
+import { getShelters } from "@/lib/shelters-api";
 
 /** ---------- Types ---------- */
 type AudienceProps = {
@@ -91,6 +92,7 @@ export default function AudienceMap({
   const vcMarkersRef = useRef<Marker[]>([]);
   const competitorMarkersRef = useRef<Marker[]>([]);
   const cofounderMarkersRef = useRef<Marker[]>([]);
+  const shelterMarkersRef = useRef<Marker[]>([]);
   const [styleUrl, setStyleUrl] = useState<string>(initialStyle);
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -839,6 +841,73 @@ export default function AudienceMap({
       loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData, handlePinClick);
     }
   }, [demographicsData, showDemographics, marketAnalysisData, handlePinClick, loadDemographicsData]);
+
+  /** Load FEMA shelter data */
+  useEffect(() => {
+    async function loadShelters() {
+      const map = mapRef.current;
+      if (!map) return;
+
+      // Wait for map to be fully loaded
+      if (!map.loaded()) {
+        map.once('load', () => loadShelters());
+        return;
+      }
+
+      try {
+        console.log("Loading FEMA shelters...");
+        const shelters = await getShelters(); // Get all shelters
+        console.log("Loaded shelters:", shelters);
+
+        // Clear existing shelter markers
+        shelterMarkersRef.current.forEach(m => m.remove());
+        shelterMarkersRef.current = [];
+
+        // Create markers for each shelter
+        shelters.forEach(shelter => {
+          if (!shelter.latitude || !shelter.longitude) return;
+
+          // Create blue marker element - LARGE for visibility
+          const el = document.createElement("div");
+          el.className = "shelter-marker";
+          el.style.width = "40px";
+          el.style.height = "40px";
+          el.style.borderRadius = "50%";
+          el.style.backgroundColor = "#00FFFF"; // Cyan/bright blue
+          el.style.border = "4px solid #FF0000"; // RED border so we can't miss it
+          el.style.boxShadow = "0 4px 16px rgba(0,255,255,0.8)";
+          el.style.cursor = "pointer";
+          el.style.zIndex = "1000";
+
+          console.log("Creating marker for:", shelter.name, "at", [shelter.longitude, shelter.latitude]);
+
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([shelter.longitude, shelter.latitude])
+            .setPopup(
+              new mapboxgl.Popup({ offset: 25 }).setHTML(
+                `<div style="padding: 10px;">
+                  <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">${shelter.name}</h3>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Address:</strong> ${shelter.address}, ${shelter.city}, ${shelter.state}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Status:</strong> ${shelter.status}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Organization:</strong> ${shelter.organization || "N/A"}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Capacity:</strong> ${shelter.evacuation_capacity || "N/A"}</p>
+                  <p style="margin: 4px 0; font-size: 12px;"><strong>Current Population:</strong> ${shelter.current_population || 0}</p>
+                </div>`
+              )
+            )
+            .addTo(mapRef.current!);
+
+          shelterMarkersRef.current.push(marker);
+        });
+
+        console.log(`Added ${shelters.length} shelter markers to map`);
+      } catch (error) {
+        console.error("Failed to load shelters:", error);
+      }
+    }
+
+    loadShelters();
+  }, []);
 
   /** Handle demographics toggle - show heatmap when demographics is enabled */
   useEffect(() => {
