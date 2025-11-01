@@ -10,6 +10,8 @@ interface UseCrisisEventsOptions {
   minConfidence?: number;
   autoRefresh?: boolean;
   refreshInterval?: number; // in milliseconds
+  countries?: string[]; // List of country codes to filter (e.g., ['US', 'GB'])
+  historicalDate?: string; // Historical date to fetch (format: YYYY-MM-DD)
 }
 
 export function useCrisisEvents(options: UseCrisisEventsOptions = {}) {
@@ -17,6 +19,8 @@ export function useCrisisEvents(options: UseCrisisEventsOptions = {}) {
     minConfidence,
     autoRefresh = true,
     refreshInterval = 60000, // 60 seconds default
+    countries,
+    historicalDate,
   } = options;
 
   const [state, setState] = useState<CrisisEventsState>({
@@ -36,7 +40,7 @@ export function useCrisisEvents(options: UseCrisisEventsOptions = {}) {
         setIsRefreshing(true);
       }
 
-      const events = await fetchCrisisEvents(minConfidence);
+      const events = await fetchCrisisEvents(minConfidence, countries, historicalDate);
 
       setState({
         events,
@@ -54,7 +58,7 @@ export function useCrisisEvents(options: UseCrisisEventsOptions = {}) {
     } finally {
       setIsRefreshing(false);
     }
-  }, [minConfidence]);
+  }, [minConfidence, countries, historicalDate]);
 
   // Manual refresh function
   const refresh = useCallback(() => {

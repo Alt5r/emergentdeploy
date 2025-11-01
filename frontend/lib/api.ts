@@ -355,10 +355,22 @@ export async function sendChatMessage(
 // Crisis Data Aggregator API functions
 import type { CrisisEvent, AggregatorStatus } from '@/types/crisis';
 
-export async function fetchCrisisEvents(minConfidence?: number): Promise<CrisisEvent[]> {
+export async function fetchCrisisEvents(
+  minConfidence?: number,
+  countries?: string[],
+  historicalDate?: string
+): Promise<CrisisEvent[]> {
   const url = new URL(`${API_BASE_URL}/api/v1/events`);
   if (minConfidence !== undefined) {
     url.searchParams.append('min_confidence', minConfidence.toString());
+  }
+  // Filter for US and UK by default
+  if (countries && countries.length > 0) {
+    url.searchParams.append('countries', countries.join(','));
+  }
+  // Add historical date parameter if provided
+  if (historicalDate) {
+    url.searchParams.append('historical_date', historicalDate);
   }
 
   const response = await fetch(url.toString());

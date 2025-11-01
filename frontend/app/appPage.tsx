@@ -38,11 +38,13 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
   const [cofoundersData, setCofoundersData] = useState<CofounderResponse | null>(null);
   const [demographicsData, setDemographicsData] = useState<unknown | null>(null);
 
-  // Crisis events data
+  // Crisis events data - filter for US and UK only, using historical data from January 7, 2025
   const { events: crisisEventsData } = useCrisisEvents({
-    minConfidence: 0.6,
-    autoRefresh: true,
+    minConfidence: 0.3,
+    autoRefresh: false, // Disable auto-refresh for historical data
     refreshInterval: 60000,
+    countries: ['US', 'GB'], // Filter for USA and UK events only
+    historicalDate: '2025-01-07', // Show historical disasters from this date
   });
 
   // Loading and alert states

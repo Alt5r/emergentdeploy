@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.config import API_CONFIG, LOGGING_CONFIG
 from backend.services.aggregator import get_verified_events, CrisisAggregator
+from backend.services.historical_data import get_historical_events_for_date
 
 # Configure logging
 logging.basicConfig(
@@ -130,6 +131,14 @@ async def get_events(
         ge=1,
         le=100,
         description="Maximum number of events to return"
+    ),
+    countries: Optional[str] = Query(
+        None,
+        description="Comma-separated list of country codes to filter (e.g., 'US,GB' for USA and UK)"
+    ),
+    historical_date: Optional[str] = Query(
+        None,
+        description="Fetch historical data for a specific date (format: YYYY-MM-DD, e.g., '2025-01-07')"
     )
 ):
     """
@@ -138,17 +147,45 @@ async def get_events(
     Args:
         min_confidence: Optional minimum confidence score filter
         limit: Optional maximum number of events to return
+        countries: Optional comma-separated list of country codes to filter
+        historical_date: Optional date to fetch historical disaster data
 
     Returns:
         List of verified crisis events
     """
     try:
         logger.info("Fetching verified crisis events...")
-        events = await get_verified_events()
 
-        # Apply filters
+        # Use historical data if date is specified
+        if historical_date:
+            logger.info(f"Using historical data for date: {historical_date}")
+            events = get_historical_events_for_date(historical_date)
+        else:
+            events = await get_verified_events()
+
+        # Apply confidence filter
         if min_confidence is not None:
             events = [e for e in events if e["confidence_score"] >= min_confidence]
+
+        # Apply country filter
+        if countries:
+            country_codes = [c.strip().upper() for c in countries.split(',')]
+            logger.info(f"Filtering events for countries: {country_codes}")
+            filtered_events = []
+            for event in events:
+                if event.get('locations'):
+                    for location in event['locations']:
+                        display_name = location.get('display_name', '').upper()
+                        # Check if any of the requested countries appear in the location name
+                        if any(
+                            ('UNITED STATES' in display_name or 'USA' in display_name or ', US' in display_name) if code == 'US'
+                            else ('UNITED KINGDOM' in display_name or 'UK' in display_name or ', GB' in display_name) if code == 'GB'
+                            else code in display_name
+                            for code in country_codes
+                        ):
+                            filtered_events.append(event)
+                            break
+            events = filtered_events
 
         if limit is not None:
             events = events[:limit]

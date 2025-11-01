@@ -5,6 +5,8 @@ import mapboxgl, { Map, Marker, LngLatBounds, FillExtrusionLayer } from "mapbox-
 import type { FeatureCollection, Feature, Point } from "geojson";
 import "mapbox-gl/dist/mapbox-gl.css";
 import UnifiedPinSidebar, { transformMarketAnalysisToStats } from "./UnifiedPinSidebar";
+import { CrisisDetailModal } from "./CrisisDetailModal";
+import type { CrisisEvent } from "@/types/crisis";
 
 /** ---------- Types ---------- */
 type AudienceProps = {
@@ -87,10 +89,13 @@ export default function AudienceMap({
   const competitorMarkersRef = useRef<Marker[]>([]);
   const cofounderMarkersRef = useRef<Marker[]>([]);
   const crisisMarkersRef = useRef<Marker[]>([]);
+  const heatmapListenerAddedRef = useRef(false);
   const [styleUrl, setStyleUrl] = useState<string>(initialStyle);
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [selectedPinData, setSelectedPinData] = useState<unknown>(null);
+  const [selectedCrisisEvent, setSelectedCrisisEvent] = useState<CrisisEvent | null>(null);
+  const [isCrisisModalOpen, setIsCrisisModalOpen] = useState(false);
 
   /** Handle pin click to show sidebar */
   const handlePinClick = useCallback((pinData: unknown) => {
@@ -128,7 +133,7 @@ export default function AudienceMap({
   };
 
   /** Load demographics data and update map */
-  const loadDemographicsData = useCallback((data: AudienceCollection, showDemographicsFlag: boolean, marketAnalysis: unknown, handlePinClickFn: (pinData: unknown) => void) => {
+  const loadDemographicsData = useCallback((data: AudienceCollection, showDemographicsFlag: boolean, marketAnalysis: unknown) => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -245,15 +250,15 @@ export default function AudienceMap({
               },
               marketStats: marketAnalysis ? transformMarketAnalysisToStats(marketAnalysis) : undefined
             };
-            handlePinClickFn(heatmapPinData);
+            handlePinClick(heatmapPinData);
           }
         });
       }
     }
-  }, []);
+  }, [handlePinClick]);
 
   /** Add heatmap layer for audience data */
-  const addHeatmapLayer = useCallback((marketAnalysis: unknown, handlePinClickFn: (pinData: unknown) => void) => {
+  const addHeatmapLayer = useCallback((marketAnalysis: unknown) => {
     const map = mapRef.current;
     if (!map || !heatmapData || !map.getSource("audience-heatmap")) return;
 
@@ -335,11 +340,11 @@ export default function AudienceMap({
             },
             marketStats: marketAnalysis ? transformMarketAnalysisToStats(marketAnalysis) : undefined
           };
-          handlePinClickFn(heatmapPinData);
+          handlePinClick(heatmapPinData);
         }
       });
     }
-  }, [heatmapData]);
+  }, [heatmapData, handlePinClick]);
 
   /** Remove heatmap layer */
   const removeHeatmapLayer = useCallback(() => {
@@ -439,7 +444,7 @@ export default function AudienceMap({
       markersRef.current.forEach((m) => m.addTo(map));
       // Re-add heatmap if demographics enabled and data exists
       if (showDemographics && heatmapData) {
-        addHeatmapLayer(marketAnalysisData, handlePinClick);
+        addHeatmapLayer(marketAnalysisData);
       }
     });
 
@@ -450,7 +455,7 @@ export default function AudienceMap({
 
         // If demographics data is available, load it immediately
         if (demographicsData) {
-          loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData, handlePinClick);
+          loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData);
         }
       } catch (err) {
         console.error("Error in map load:", err);
@@ -552,7 +557,7 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying VCs:", error);
     }
-  }, [showVCs, vcsData, handlePinClick]);
+  }, [showVCs, vcsData]);
 
   /** Handle Competitor toggle - display competitors as pins */
   useEffect(() => {
@@ -636,7 +641,7 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying competitors:", error);
     }
-  }, [showCompetitors, competitorsData, handlePinClick]);
+  }, [showCompetitors, competitorsData]);
 
   /** Handle Cofounder toggle - display cofounders as pins */
   useEffect(() => {
@@ -716,7 +721,7 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying cofounders:", error);
     }
-  }, [showCofounders, cofoundersData, handlePinClick]);
+  }, [showCofounders, cofoundersData]);
 
   /** Handle Crisis Events toggle - display crisis events as pins */
   useEffect(() => {
@@ -733,27 +738,14 @@ export default function AudienceMap({
 
     try {
       // Add crisis event markers to the map
-      crisisEventsData.forEach((event: { event_id: string; title: string; locations: Array<{ latitude: number; longitude: number; display_name: string }>; confidence_score: number; description: string; published: string; source_count: number }) => {
-        const { event_id, title, locations, confidence_score, description, published, source_count } = event;
+      crisisEventsData.forEach((event: CrisisEvent) => {
+        const { event_id, title, locations, confidence_score, description, published, source_count, sources, verified_at, location_text } = event;
 
         if (!locations || locations.length === 0) return;
 
         // Display marker for each location
         locations.forEach((location) => {
           if (!location?.latitude || !location?.longitude) return;
-
-          // Prepare crisis event data for sidebar
-          const crisisEventData = {
-            type: 'crisis',
-            event_id,
-            title,
-            description,
-            confidence_score,
-            published,
-            source_count,
-            location: location.display_name,
-            coordinates: location,
-          };
 
           // Determine color based on confidence score
           let markerColor = '#ef4444'; // red for low
@@ -777,6 +769,7 @@ export default function AudienceMap({
             align-items: center;
             justify-content: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
           `;
           el.innerHTML = `
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -785,6 +778,14 @@ export default function AudienceMap({
               <path d="M12 17h.01"></path>
             </svg>
           `;
+
+          // Add hover effect
+          el.addEventListener('mouseenter', () => {
+            el.style.transform = 'scale(1.2)';
+          });
+          el.addEventListener('mouseleave', () => {
+            el.style.transform = 'scale(1)';
+          });
 
           const [lng, lat] = offsetDuplicateCoordinates(
             location.latitude,
@@ -796,10 +797,11 @@ export default function AudienceMap({
             .setLngLat([lng, lat])
             .addTo(map);
 
-          // Add click handler for sidebar
+          // Add click handler to open modal with full event data
           el.addEventListener('click', (e) => {
             e.stopPropagation();
-            handlePinClick(crisisEventData);
+            setSelectedCrisisEvent(event);
+            setIsCrisisModalOpen(true);
           });
 
           crisisMarkersRef.current.push(marker);
@@ -808,44 +810,147 @@ export default function AudienceMap({
     } catch (error) {
       console.error("Error displaying crisis events:", error);
     }
-  }, [showCrisisEvents, crisisEventsData, handlePinClick]);
+  }, [showCrisisEvents, crisisEventsData]);
 
-  /** Handle demographics data changes */
-  useEffect(() => {
-    if (demographicsData && mapRef.current) {
-      console.log("Demographics data received, loading into map:", demographicsData);
-      loadDemographicsData(demographicsData as AudienceCollection, showDemographics, marketAnalysisData, handlePinClick);
-    }
-  }, [demographicsData, showDemographics, marketAnalysisData, handlePinClick, loadDemographicsData]);
-
-  /** Handle demographics toggle - show heatmap when demographics is enabled */
+  /** Handle demographics data and toggle */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (showDemographics && heatmapData) {
-      // Clear any existing markers when demographics is enabled
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current = [];
+    // Clear existing markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    // If demographics data is provided and we should show it
+    if (showDemographics && demographicsData) {
+      console.log("Demographics data received, loading into map:", demographicsData);
+      const data = demographicsData as AudienceCollection;
+
+      // Fit bounds / center
+      const coords = data.features.map((f) => f.geometry.coordinates);
+      if (coords.length > 1) {
+        const bounds = new LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]);
+        coords.forEach((c) => bounds.extend(c as [number, number]));
+        map.fitBounds(bounds, { padding: 100, duration: 1200 });
+      } else if (coords.length === 1) {
+        map.setCenter(coords[0] as [number, number]);
+        map.setZoom(10);
+      }
 
       // Remove existing heatmap first
-      removeHeatmapLayer();
+      if (map.getLayer("audience-heatmap-layer")) {
+        map.removeLayer("audience-heatmap-layer");
+      }
+      if (map.getSource("audience-heatmap")) {
+        map.removeSource("audience-heatmap");
+      }
 
       // Add heatmap source
       map.addSource("audience-heatmap", {
         type: "geojson",
-        data: heatmapData,
+        data: data,
       });
 
       // Add heatmap layer
-      addHeatmapLayer(marketAnalysisData, handlePinClick);
+      map.addLayer({
+        id: "audience-heatmap-layer",
+        type: "heatmap",
+        source: "audience-heatmap",
+        maxzoom: 15,
+        paint: {
+          "heatmap-weight": [
+            "interpolate",
+            ["linear"],
+            ["get", "weight"],
+            0,
+            0,
+            1,
+            1,
+          ],
+          "heatmap-intensity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            1,
+            15,
+            3,
+          ],
+          "heatmap-color": [
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0,
+            "rgba(0, 0, 255, 0)",
+            0.1,
+            "rgb(0, 0, 255)",
+            0.3,
+            "rgb(0, 255, 0)",
+            0.5,
+            "rgb(255, 255, 0)",
+            0.7,
+            "rgb(255, 165, 0)",
+            1,
+            "rgb(255, 0, 0)",
+          ],
+          "heatmap-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            20,
+            15,
+            60,
+          ],
+          "heatmap-opacity": 0.6,
+        },
+      });
+
+      // Add cursor pointer for clickable heatmap
+      map.getCanvas().style.cursor = "pointer";
+
+      // Add click interactions for heatmap (only once)
+      if (!heatmapListenerAddedRef.current) {
+        map.on("click", "audience-heatmap-layer", (e) => {
+          e.preventDefault();
+          e.originalEvent.stopPropagation();
+          if (e.features && e.features.length > 0) {
+            const feature = e.features[0] as unknown as AudienceFeature;
+            // Convert heatmap feature to pin data format
+            const heatmapPinData = {
+              type: 'audience',
+              name: feature.properties?.name || 'Audience Member',
+              location: feature.properties?.display_name || feature.properties?.area_code || 'Unknown Location',
+              description: feature.properties?.description,
+              target_fit: feature.properties?.target_fit,
+              weight: feature.properties?.weight || 1,
+              coordinates: {
+                latitude: feature.geometry.coordinates[1],
+                longitude: feature.geometry.coordinates[0]
+              },
+              marketStats: marketAnalysisData ? transformMarketAnalysisToStats(marketAnalysisData) : undefined
+            };
+            handlePinClick(heatmapPinData);
+          }
+        });
+        heatmapListenerAddedRef.current = true;
+      }
+
+      // Store data for use in other effects
+      setHeatmapData(data);
     } else {
-      // When demographics is disabled, remove heatmap and clear all markers
-      removeHeatmapLayer();
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current = [];
+      // When demographics is disabled, remove heatmap
+      if (map.getLayer("audience-heatmap-layer")) {
+        map.removeLayer("audience-heatmap-layer");
+      }
+      if (map.getSource("audience-heatmap")) {
+        map.removeSource("audience-heatmap");
+      }
+      setHeatmapData(null);
+      heatmapListenerAddedRef.current = false;
     }
-  }, [showDemographics, heatmapData, addHeatmapLayer, removeHeatmapLayer, marketAnalysisData, handlePinClick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demographicsData, showDemographics, marketAnalysisData]);
 
   /** Toggle styles using setStyle (no re-init) and preserve globe */
   const handleToggleTheme = () => {
@@ -895,6 +1000,13 @@ export default function AudienceMap({
         onClose={handleSidebarClose}
         position="left"
         width="400px"
+      />
+
+      {/* Crisis Event Detail Modal */}
+      <CrisisDetailModal
+        event={selectedCrisisEvent}
+        isOpen={isCrisisModalOpen}
+        onClose={() => setIsCrisisModalOpen(false)}
       />
     </div>
   );

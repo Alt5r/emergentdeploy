@@ -17,7 +17,8 @@ AGGREGATOR_CONFIG = {
 
     # Minimum confidence score (0.0 - 1.0) for an event to be considered verified
     # Events below this threshold will be flagged for human review
-    "min_confidence_threshold": 0.6,
+    # Lowered to 0.3 to capture small-scale local events
+    "min_confidence_threshold": 0.3,
 
     # Path to RSS sources configuration file
     "sources_file": BASE_DIR / "services" / "data" / "sources.json",
