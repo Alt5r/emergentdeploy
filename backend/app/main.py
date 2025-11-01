@@ -5,18 +5,24 @@ This module provides REST API endpoints for accessing crisis event data
 """
 
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime
+import asyncio
+import os
+from typing import List, Dict, Optional, Union
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
 from backend.config import API_CONFIG, LOGGING_CONFIG
 from backend.services.aggregator import get_verified_events, CrisisAggregator
-from backend.services.historical_data import get_historical_events_for_date
-from backend.services.fema_shelters import FEMAShelterService
+from backend.services.satellite.models import Hotspot, SatelliteSignal
+from backend.services.satellite.firms import fetch_firms_signals
+from backend.services.satellite.cluster import cluster_fire
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -32,18 +38,15 @@ app = FastAPI(
     version=API_CONFIG["version"]
 )
 
-# Add CORS middleware to allow frontend requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Global aggregator instance (could be moved to dependency injection)
 aggregator = CrisisAggregator()
-fema_service = FEMAShelterService()
+
+# Satellite module storage (in-memory for MVP)
+SATELLITE_SIGNALS: List[SatelliteSignal] = []
+SATELLITE_HOTSPOTS: Dict[str, Hotspot] = {}
+
+# Satellite configuration
+POLL_SECONDS = int(os.getenv("POLL_SECONDS", "300"))
 
 
 # Pydantic models for API responses
@@ -143,14 +146,6 @@ async def get_events(
         ge=1,
         le=100,
         description="Maximum number of events to return"
-    ),
-    countries: Optional[str] = Query(
-        None,
-        description="Comma-separated list of country codes to filter (e.g., 'US,GB' for USA and UK)"
-    ),
-    historical_date: Optional[str] = Query(
-        None,
-        description="Fetch historical data for a specific date (format: YYYY-MM-DD, e.g., '2025-01-07')"
     )
 ):
     """
@@ -159,45 +154,17 @@ async def get_events(
     Args:
         min_confidence: Optional minimum confidence score filter
         limit: Optional maximum number of events to return
-        countries: Optional comma-separated list of country codes to filter
-        historical_date: Optional date to fetch historical disaster data
 
     Returns:
         List of verified crisis events
     """
     try:
         logger.info("Fetching verified crisis events...")
+        events = await get_verified_events()
 
-        # Use historical data if date is specified
-        if historical_date:
-            logger.info(f"Using historical data for date: {historical_date}")
-            events = get_historical_events_for_date(historical_date)
-        else:
-            events = await get_verified_events()
-
-        # Apply confidence filter
+        # Apply filters
         if min_confidence is not None:
             events = [e for e in events if e["confidence_score"] >= min_confidence]
-
-        # Apply country filter
-        if countries:
-            country_codes = [c.strip().upper() for c in countries.split(',')]
-            logger.info(f"Filtering events for countries: {country_codes}")
-            filtered_events = []
-            for event in events:
-                if event.get('locations'):
-                    for location in event['locations']:
-                        display_name = location.get('display_name', '').upper()
-                        # Check if any of the requested countries appear in the location name
-                        if any(
-                            ('UNITED STATES' in display_name or 'USA' in display_name or ', US' in display_name) if code == 'US'
-                            else ('UNITED KINGDOM' in display_name or 'UK' in display_name or ', GB' in display_name) if code == 'GB'
-                            else code in display_name
-                            for code in country_codes
-                        ):
-                            filtered_events.append(event)
-                            break
-            events = filtered_events
 
         if limit is not None:
             events = events[:limit]
@@ -261,6 +228,119 @@ async def refresh_events():
         raise HTTPException(status_code=500, detail="Failed to refresh events")
 
 
+# ============================================================================
+# Satellite Module Endpoints
+# ============================================================================
+
+@app.get(f"{API_CONFIG['prefix']}/hotspots", response_model=List[Hotspot])
+async def get_hotspots(
+    hazard: str = Query("fire", pattern="^fire$", description="Hazard type (MVP: fire only)"),
+    min_intensity: Optional[float] = Query(None, ge=0.0, description="Minimum FRP sum filter")
+):
+    """
+    Get active fire hotspots from satellite detections.
+
+    Returns clustered fire detections with intensity metrics and provenance.
+
+    Args:
+        hazard: Hazard type filter (currently only 'fire' supported)
+        min_intensity: Optional minimum FRP sum filter
+
+    Returns:
+        List of active fire hotspots
+    """
+    try:
+        hotspots = [h for h in SATELLITE_HOTSPOTS.values() if h.hazard == hazard]
+
+        if min_intensity is not None:
+            hotspots = [
+                h for h in hotspots
+                if h.intensity.get("frp_sum", 0.0) >= min_intensity
+            ]
+
+        logger.info(f"Returning {len(hotspots)} hotspots (hazard={hazard})")
+        return hotspots
+
+    except Exception as e:
+        logger.error(f"Error fetching hotspots: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch hotspots")
+
+
+@app.post(f"{API_CONFIG['prefix']}/ingest/satellite")
+async def ingest_satellite():
+    """
+    Manually trigger satellite data ingestion and clustering.
+
+    This endpoint fetches the latest FIRMS data, clusters it, and updates hotspots.
+
+    Returns:
+        Summary of ingestion operation
+    """
+    try:
+        logger.info("[SATELLITE] Manual ingestion triggered")
+
+        # Fetch new signals
+        new_signals = fetch_firms_signals()
+
+        # Merge with existing signals (dedupe by ID)
+        known_ids = {s.id for s in SATELLITE_SIGNALS}
+        added = 0
+        for sig in new_signals:
+            if sig.id not in known_ids:
+                SATELLITE_SIGNALS.append(sig)
+                added += 1
+
+        # Cluster signals into hotspots
+        hotspots = cluster_fire(SATELLITE_SIGNALS)
+
+        # Update hotspot storage
+        for h in hotspots:
+            SATELLITE_HOTSPOTS[h.id] = h
+
+        # Prune old hotspots (older than 6 hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+        pruned = 0
+        for h_id, h in list(SATELLITE_HOTSPOTS.items()):
+            h_time = datetime.fromisoformat(h.latest_time.replace("Z", "+00:00"))
+            if h_time < cutoff:
+                SATELLITE_HOTSPOTS.pop(h_id, None)
+                pruned += 1
+
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "signals_fetched": len(new_signals),
+            "signals_added": added,
+            "total_signals": len(SATELLITE_SIGNALS),
+            "hotspots_active": len(SATELLITE_HOTSPOTS),
+            "hotspots_pruned": pruned
+        }
+
+    except Exception as e:
+        logger.error(f"Error during satellite ingestion: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Satellite ingestion failed: {str(e)}")
+
+
+@app.get(f"{API_CONFIG['prefix']}/satellite/status")
+async def get_satellite_status():
+    """
+    Get satellite module status and configuration.
+
+    Returns:
+        Configuration and current state
+    """
+    return {
+        "firms_url": os.getenv("FIRMS_URL", "NOT_SET"),
+        "poll_seconds": POLL_SECONDS,
+        "window_min": int(os.getenv("WINDOW_MIN", "90")),
+        "eps_km": float(os.getenv("EPS_KM", "5.0")),
+        "min_pts": int(float(os.getenv("MIN_PTS", "3"))),
+        "signals_cached": len(SATELLITE_SIGNALS),
+        "hotspots_active": len(SATELLITE_HOTSPOTS)
+    }
+
+
+# ============================================================================
 # TODO: Future endpoints for alert system
 @app.post(f"{API_CONFIG['prefix']}/alerts/trigger")
 async def trigger_alert(event_id: str):
@@ -289,47 +369,76 @@ async def plan_evacuation(event_id: str):
     }
 
 
-# FEMA Shelter endpoints
-@app.get("/api/v1/shelters")
-async def get_shelters(
-    state: Optional[str] = Query(None, description="Two-letter state code (e.g., CA, TX)"),
-    status: Optional[str] = Query(None, description="Shelter status (OPEN, CLOSED)")
-):
-    """
-    Get FEMA shelter data
+# ============================================================================
+# Background Worker for Satellite Polling
+# ============================================================================
 
-    Returns shelters filtered by state and/or status
+async def satellite_worker_loop():
     """
-    try:
-        shelters = fema_service.get_shelters(state=state, status=status)
-        return {
-            "status": "success",
-            "count": len(shelters),
-            "shelters": shelters
-        }
-    except Exception as e:
-        logger.error(f"Error fetching shelters: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch shelter data")
+    Background worker that periodically fetches FIRMS data and updates hotspots.
+
+    Runs continuously with POLL_SECONDS interval between cycles.
+    """
+    logger.info(f"[SATELLITE WORKER] Starting (poll interval: {POLL_SECONDS}s)")
+
+    while True:
+        try:
+            logger.info("[SATELLITE WORKER] Polling FIRMS...")
+
+            # Fetch new signals
+            new_signals = fetch_firms_signals()
+
+            # Merge with existing signals (dedupe by ID)
+            known_ids = {s.id for s in SATELLITE_SIGNALS}
+            added = 0
+            for sig in new_signals:
+                if sig.id not in known_ids:
+                    SATELLITE_SIGNALS.append(sig)
+                    added += 1
+
+            # Cluster signals into hotspots
+            hotspots = cluster_fire(SATELLITE_SIGNALS)
+
+            # Update hotspot storage
+            for h in hotspots:
+                SATELLITE_HOTSPOTS[h.id] = h
+
+            # Prune old hotspots (older than 6 hours)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            pruned = 0
+            for h_id, h in list(SATELLITE_HOTSPOTS.items()):
+                h_time = datetime.fromisoformat(h.latest_time.replace("Z", "+00:00"))
+                if h_time < cutoff:
+                    SATELLITE_HOTSPOTS.pop(h_id, None)
+                    pruned += 1
+
+            logger.info(
+                f"[SATELLITE WORKER] Cycle complete: "
+                f"fetched={len(new_signals)}, added={added}, "
+                f"signals_total={len(SATELLITE_SIGNALS)}, "
+                f"hotspots={len(SATELLITE_HOTSPOTS)}, pruned={pruned}"
+            )
+
+        except Exception as e:
+            logger.error(f"[SATELLITE WORKER] Error: {e}", exc_info=True)
+
+        # Wait for next poll cycle
+        await asyncio.sleep(POLL_SECONDS)
 
 
-@app.get("/api/v1/shelters/california")
-async def get_california_shelters():
-    """
-    Get all shelters in California
+@app.on_event("startup")
+async def startup_event():
+    """Launch background worker on application startup"""
+    firms_url = os.getenv("FIRMS_URL", "")
 
-    Convenience endpoint for California-specific shelter data
-    """
-    try:
-        shelters = fema_service.get_california_shelters()
-        return {
-            "status": "success",
-            "state": "CA",
-            "count": len(shelters),
-            "shelters": shelters
-        }
-    except Exception as e:
-        logger.error(f"Error fetching California shelters: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch California shelter data")
+    if firms_url:
+        logger.info("[STARTUP] FIRMS_URL configured, launching satellite worker")
+        asyncio.create_task(satellite_worker_loop())
+    else:
+        logger.warning(
+            "[STARTUP] FIRMS_URL not set - satellite module disabled. "
+            "Set FIRMS_URL in .env to enable fire hotspot detection."
+        )
 
 
 if __name__ == "__main__":
