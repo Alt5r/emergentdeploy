@@ -1,0 +1,89 @@
+{
+  "sources": [
+    {
+      "id": "reuters_disasters",
+      "name": "Reuters - Disasters",
+      "url": "https://www.reuters.com/rssfeed/disastersNews",
+      "category": "major_news",
+      "reliability_weight": 0.95,
+      "tags": ["disasters", "natural-disasters", "emergencies"]
+    },
+    {
+      "id": "ap_disasters",
+      "name": "Associated Press - Natural Disasters",
+      "url": "https://apnews.com/hub/natural-disasters",
+      "category": "major_news",
+      "reliability_weight": 0.95,
+      "tags": ["disasters", "natural-disasters"]
+    },
+    {
+      "id": "bbc_world",
+      "name": "BBC News - World",
+      "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+      "category": "major_news",
+      "reliability_weight": 0.9,
+      "tags": ["world-news", "disasters"]
+    },
+    {
+      "id": "fema_news",
+      "name": "FEMA - News Releases",
+      "url": "https://www.fema.gov/about/news-multimedia/news-releases.xml",
+      "category": "government",
+      "reliability_weight": 1.0,
+      "tags": ["disasters", "emergencies", "government", "usa"]
+    },
+    {
+      "id": "usgs_earthquakes",
+      "name": "USGS - Earthquakes M4.5+",
+      "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.atom",
+      "category": "government",
+      "reliability_weight": 1.0,
+      "tags": ["earthquakes", "geological", "government"]
+    },
+    {
+      "id": "nws_alerts",
+      "name": "National Weather Service - Alerts",
+      "url": "https://alerts.weather.gov/cap/us.php?x=0",
+      "category": "government",
+      "reliability_weight": 1.0,
+      "tags": ["weather", "alerts", "government", "usa"]
+    },
+    {
+      "id": "reliefweb_disasters",
+      "name": "ReliefWeb - Disasters",
+      "url": "https://reliefweb.int/updates/rss.xml",
+      "category": "specialized",
+      "reliability_weight": 0.85,
+      "tags": ["disasters", "humanitarian", "global"]
+    },
+    {
+      "id": "gdacs_alerts",
+      "name": "GDACS - Global Disaster Alert",
+      "url": "https://www.gdacs.org/xml/rss.xml",
+      "category": "specialized",
+      "reliability_weight": 0.9,
+      "tags": ["disasters", "global", "alerts"]
+    },
+    {
+      "id": "cnn_us",
+      "name": "CNN - US News",
+      "url": "http://rss.cnn.com/rss/cnn_us.rss",
+      "category": "major_news",
+      "reliability_weight": 0.85,
+      "tags": ["news", "usa"]
+    },
+    {
+      "id": "guardian_world",
+      "name": "The Guardian - World News",
+      "url": "https://www.theguardian.com/world/rss",
+      "category": "major_news",
+      "reliability_weight": 0.85,
+      "tags": ["world-news"]
+    }
+  ],
+  "metadata": {
+    "last_updated": "2025-01-01",
+    "version": "1.0",
+    "notes": "RSS feeds for crisis and disaster monitoring. Reliability weights range from 0.0-1.0, with government sources rated highest."
+  }
+}
