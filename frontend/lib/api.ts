@@ -352,3 +352,57 @@ export async function sendChatMessage(
   });
 }
 
+// Crisis Data Aggregator API functions
+import type { CrisisEvent, AggregatorStatus } from '@/types/crisis';
+
+export async function fetchCrisisEvents(minConfidence?: number): Promise<CrisisEvent[]> {
+  const url = new URL(`${API_BASE_URL}/api/v1/events`);
+  if (minConfidence !== undefined) {
+    url.searchParams.append('min_confidence', minConfidence.toString());
+  }
+
+  const response = await fetch(url.toString());
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(`Failed to fetch crisis events: ${errorData.detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getCrisisEventById(eventId: string): Promise<CrisisEvent> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/events/${eventId}`);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(`Failed to fetch crisis event: ${errorData.detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function refreshCrisisEvents(): Promise<{ status: string; events_count: number; timestamp: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/refresh`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(`Failed to refresh crisis events: ${errorData.detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getAggregatorStatus(): Promise<AggregatorStatus> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/status`);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(`Failed to fetch aggregator status: ${errorData.detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+

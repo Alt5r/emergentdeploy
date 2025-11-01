@@ -11,6 +11,7 @@ import { findCompetitors, findVCs, findCofounders, getAudienceMap, sendChatMessa
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { useStartup } from "@/contexts/StartupContext";
+import { useCrisisEvents } from "@/hooks/useCrisisEvents";
 
 type LoadingStatus = "competitors" | "vcs" | "cofounders" | "demographics" | null;
 type AlertType = { type: "success" | "error"; message: string } | null;
@@ -29,12 +30,20 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
   const [showCompetitors, setShowCompetitors] = useState(true);
   const [showDemographics, setShowDemographics] = useState(true);
   const [showCofounders, setShowCofounders] = useState(true);
+  const [showCrisisEvents, setShowCrisisEvents] = useState(true);
 
   // Cached data
   const [competitorsData, setCompetitorsData] = useState<CompetitorResponse | null>(null);
   const [vcsData, setVCsData] = useState<VCResponse | null>(null);
   const [cofoundersData, setCofoundersData] = useState<CofounderResponse | null>(null);
   const [demographicsData, setDemographicsData] = useState<unknown | null>(null);
+
+  // Crisis events data
+  const { events: crisisEventsData } = useCrisisEvents({
+    minConfidence: 0.6,
+    autoRefresh: true,
+    refreshInterval: 60000,
+  });
 
   // Loading and alert states
   const [currentLoading, setCurrentLoading] = useState<LoadingStatus>(null);
@@ -278,6 +287,12 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 <FieldSwitch
+                  title="Crisis Events"
+                  description="Real-time verified disaster events"
+                  checked={showCrisisEvents}
+                  onCheckedChange={setShowCrisisEvents}
+                />
+                <FieldSwitch
                   title="Affected Areas"
                   description="Where are the disaster impact zones?"
                   checked={showDemographics}
@@ -344,6 +359,12 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
 
       {/* Desktop Switches - hidden on mobile */}
       <div className="hidden sm:flex absolute top-4 right-4 z-10 flex-col gap-2">
+        <FieldSwitch
+          title="Crisis Events"
+          description="Real-time verified disaster events"
+          checked={showCrisisEvents}
+          onCheckedChange={setShowCrisisEvents}
+        />
         <FieldSwitch
           title="Affected Areas"
           description="Where are the disaster impact zones?"
@@ -525,10 +546,12 @@ export default function AppPage({ initialQuery, onGeneratePitchDeck, isGeneratin
           showCompetitors={showCompetitors}
           showDemographics={showDemographics}
           showCofounders={showCofounders}
+          showCrisisEvents={showCrisisEvents}
           competitorsData={competitorsData}
           vcsData={vcsData}
           cofoundersData={cofoundersData}
           demographicsData={demographicsData}
+          crisisEventsData={crisisEventsData}
         />
       </div>
     </div>

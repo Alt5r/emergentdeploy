@@ -36,12 +36,14 @@ type AudienceMapProps = {
   showCompetitors?: boolean;
   showDemographics?: boolean;
   showCofounders?: boolean;
+  showCrisisEvents?: boolean;
   /** Data from API calls */
   competitorsData?: unknown;
   vcsData?: unknown;
   cofoundersData?: unknown;
   demographicsData?: unknown;
   marketAnalysisData?: unknown;
+  crisisEventsData?: unknown;
 };
 
 /** ---------- Styles ---------- */
@@ -67,6 +69,7 @@ export default function AudienceMap({
   cofoundersData,
   demographicsData,
   marketAnalysisData,
+  crisisEventsData,
   initialStyle = DEFAULT_STYLE,
   enableThemeToggle = false,
   style,
@@ -75,6 +78,7 @@ export default function AudienceMap({
   showCompetitors = true,
   showDemographics = true,
   showCofounders = true,
+  showCrisisEvents = true,
 }: AudienceMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -82,6 +86,7 @@ export default function AudienceMap({
   const vcMarkersRef = useRef<Marker[]>([]);
   const competitorMarkersRef = useRef<Marker[]>([]);
   const cofounderMarkersRef = useRef<Marker[]>([]);
+  const crisisMarkersRef = useRef<Marker[]>([]);
   const [styleUrl, setStyleUrl] = useState<string>(initialStyle);
   const [heatmapData, setHeatmapData] = useState<AudienceCollection | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -100,7 +105,7 @@ export default function AudienceMap({
   }, []);
 
   /** Offset coordinates to prevent overlapping markers with different patterns for each type */
-  const offsetDuplicateCoordinates = (lat: number, lng: number, markerType: 'vc' | 'competitor' | 'cofounder' = 'vc') => {
+  const offsetDuplicateCoordinates = (lat: number, lng: number, markerType: 'vc' | 'competitor' | 'cofounder' | 'crisis' = 'vc') => {
     const BASE_OFFSET = 0.03; // Base offset in degrees (~33 meters)
 
     // Different offset patterns for each marker type to ensure they don't overlap
@@ -108,6 +113,7 @@ export default function AudienceMap({
       vc: { lat: 0, lng: 0 }, // VCs stay at original position
       competitor: { lat: BASE_OFFSET, lng: BASE_OFFSET }, // Competitors offset northeast
       cofounder: { lat: -BASE_OFFSET, lng: BASE_OFFSET }, // Cofounders offset northwest
+      crisis: { lat: BASE_OFFSET, lng: -BASE_OFFSET }, // Crisis events offset southeast
     };
 
     const pattern = offsetPatterns[markerType];
@@ -711,6 +717,98 @@ export default function AudienceMap({
       console.error("Error displaying cofounders:", error);
     }
   }, [showCofounders, cofoundersData, handlePinClick]);
+
+  /** Handle Crisis Events toggle - display crisis events as pins */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove existing crisis event markers
+    crisisMarkersRef.current.forEach((m) => m.remove());
+    crisisMarkersRef.current = [];
+
+    if (!showCrisisEvents || !crisisEventsData || !Array.isArray(crisisEventsData)) return;
+
+    console.log("Displaying crisis events on map:", crisisEventsData);
+
+    try {
+      // Add crisis event markers to the map
+      crisisEventsData.forEach((event: { event_id: string; title: string; locations: Array<{ latitude: number; longitude: number; display_name: string }>; confidence_score: number; description: string; published: string; source_count: number }) => {
+        const { event_id, title, locations, confidence_score, description, published, source_count } = event;
+
+        if (!locations || locations.length === 0) return;
+
+        // Display marker for each location
+        locations.forEach((location) => {
+          if (!location?.latitude || !location?.longitude) return;
+
+          // Prepare crisis event data for sidebar
+          const crisisEventData = {
+            type: 'crisis',
+            event_id,
+            title,
+            description,
+            confidence_score,
+            published,
+            source_count,
+            location: location.display_name,
+            coordinates: location,
+          };
+
+          // Determine color based on confidence score
+          let markerColor = '#ef4444'; // red for low
+          if (confidence_score >= 0.8) {
+            markerColor = '#22c55e'; // green for high
+          } else if (confidence_score >= 0.6) {
+            markerColor = '#eab308'; // yellow for medium
+          }
+
+          // Create a custom crisis event marker element
+          const el = document.createElement("div");
+          el.className = "crisis-marker";
+          el.style.cssText = `
+            background-color: ${markerColor};
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          `;
+          el.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+              <path d="M12 9v4"></path>
+              <path d="M12 17h.01"></path>
+            </svg>
+          `;
+
+          const [lng, lat] = offsetDuplicateCoordinates(
+            location.latitude,
+            location.longitude,
+            'crisis'
+          );
+
+          const marker = new mapboxgl.Marker({ element: el, draggable: false })
+            .setLngLat([lng, lat])
+            .addTo(map);
+
+          // Add click handler for sidebar
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePinClick(crisisEventData);
+          });
+
+          crisisMarkersRef.current.push(marker);
+        });
+      });
+    } catch (error) {
+      console.error("Error displaying crisis events:", error);
+    }
+  }, [showCrisisEvents, crisisEventsData, handlePinClick]);
 
   /** Handle demographics data changes */
   useEffect(() => {
