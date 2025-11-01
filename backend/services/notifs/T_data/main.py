@@ -15,9 +15,21 @@ def main():
         return
 
     detected_events = []
+    
+    # First, show a sample of data from the first buoy to verify timestamps
+    print(f"\n--- Checking data freshness from first station: {station_ids[0]} ---")
+    sample_df = fetch_dart_data(station_ids[0])
+    if sample_df is not None and not sample_df.empty:
+        print("Sample of data (first 5 rows with timestamps):")
+        print(sample_df.head())
+        print("\nLast 5 measurements:")
+        print(sample_df.tail())
+        print(f"\nColumns available: {list(sample_df.columns)}")
+    else:
+        print("Could not fetch sample data.")
 
     # Step 2: Iterate through each station, fetch its data, and analyze it
-    print(f"\nAnalyzing data for {len(station_ids)} stations...")
+    print(f"\n\nAnalyzing data for {len(station_ids)} stations...")
     for i, station_id in enumerate(station_ids):
         # Print progress to the console
         print(f"  ({i+1}/{len(station_ids)}) Checking station: {station_id}", end='\r')
